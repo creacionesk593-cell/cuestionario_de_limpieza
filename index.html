@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronograma de Limpieza Mensual</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            background: #00b4db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0083b0;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,180,219,0.3);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .calendar-day {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 160px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .download-mode .day-actions,
+        .download-mode .person-count,
+        .download-mode .notes-section,
+        .download-mode .controls,
+        .download-mode .file-upload-section,
+        .download-mode #statusMessage {
+            display: none !important;
+        }
+
+        .calendar-day.hidden {
+            opacity: 0.5;
+            background-color: #f0f0f0;
+        }
+
+        .calendar-day.drag-over {
+            border: 3px dashed #00b4db;
+            background: #e3f2fd;
+        }
+
+        .calendar-day.sunday {
+            background: #ffeaea;
+        }
+
+        .calendar-day.empty {
+            background: #f8f9fa;
+            opacity: 0.7;
+        }
+
+        .day-header {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00b4db;
+            margin-bottom: 10px;
+            text-align: center;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .sunday .day-header {
+            color: #d63031;
+        }
+
+        .day-content {
+            font-size: 15px;
+            color: #333;
+            line-height: 1.4;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .no-activity {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            color: #6c757d;
+            padding: 10px;
+        }
+
+        .person-item {
+            padding: 6px 8px;
+            margin: 3px 0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            font-size: 14px;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+
+        .person-item:hover {
+            background: #e9ecef;
+            transform: scale(1.02);
+        }
+
+        .person-item.dragging {
+            opacity: 0.5;
+            background: #cce7ff;
+        }
+
+        .person-item.drag-over {
+            background: #e3f2fd;
+            border: 2px dashed #00b4db;
+        }
+
+        .person-item.drop-above {
+            border-top: 3px solid #00b4db;
+        }
+
+        .person-item.drop-below {
+            border-bottom: 3px solid #00b4db;
+        }
+
+        .group-header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .login-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-modal.active {
+            display: flex;
+        }
+
+        .login-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+            max-width: 350px;
+            width: 90%;
+        }
+
+        .login-box h2 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+            font-size: 1.6em;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #555;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #00b4db;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-info span {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .notes-section {
+            background: #fff3cd;
+            padding: 15px 20px;
+            margin: 15px 25px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+
+        .notes-section h3 {
+            margin-bottom: 8px;
+            color: #856404;
+            font-size: 17px;
+        }
+
+        .notes-section p {
+            margin: 4px 0;
+            color: #856404;
+            font-size: 15px;
+        }
+
+        .file-input-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-input-container input[type="file"] {
+            display: none;
+        }
+
+        .file-input-label {
+            padding: 10px 14px;
+            background: #6c757d;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        .drag-info {
+            text-align: center;
+            padding: 8px;
+            color: #6c757d;
+            font-style: italic;
+            grid-column: 1 / -1;
+            font-size: 15px;
+        }
+
+        .status-message {
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 15px;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .date-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .file-upload-section {
+            background: #e9f7fe;
+            padding: 12px 15px;
+            margin: 15px 25px;
+            border-radius: 8px;
+            border-left: 4px solid #00b4db;
+        }
+
+        .day-actions {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            display: flex;
+            gap: 4px;
+        }
+
+        .action-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .add-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        .add-btn:hover {
+            background: #218838;
+            transform: scale(1.1);
+        }
+
+        .clear-btn {
+            background: #dc3545;
+            color: white;
+        }
+
+        .clear-btn:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        .remove-btn {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .remove-btn:hover {
+            background: #e0a800;
+            transform: scale(1.1);
+        }
+
+        .toggle-btn {
+            background: #6c757d;
+            color: white;
+        }
+
+        .toggle-btn:hover {
+            background: #5a6268;
+            transform: scale(1.1);
+        }
+
+        .person-count {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .time-label {
+            font-size: 10px;
+            color: #dc3545;
+            font-weight: bold;
+            text-align: center;
+            padding: 2px 4px;
+            background: rgba(220, 53, 69, 0.1);
+            border-radius: 2px;
+            margin: 2px 0;
+        }
+
+        .person-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .font-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .font-btn {
+            width: 38px;
+            height: 38px;
+            border: none;
+            border-radius: 4px;
+            background: #6c757d;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .font-select {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .font-xs .person-item { font-size: 10px; padding: 3px 5px; }
+        .font-sm .person-item { font-size: 12px; padding: 4px 6px; }
+        .font-md .person-item { font-size: 14px; padding: 5px 7px; }
+        .font-lg .person-item { font-size: 16px; padding: 6px 8px; }
+        .font-xl .person-item { font-size: 18px; padding: 7px 9px; }
+
+        .font-xs .day-header { font-size: 13px; }
+        .font-sm .day-header { font-size: 14px; }
+        .font-md .day-header { font-size: 16px; }
+        .font-lg .day-header { font-size: 18px; }
+        .font-xl .day-header { font-size: 20px; }
+
+        .orientation-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .orientation-modal.active {
+            display: flex;
+        }
+
+        .orientation-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .orientation-box h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.6em;
+        }
+
+        .orientation-options {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .orientation-option {
+            padding: 15px 25px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .orientation-option:hover {
+            border-color: #00b4db;
+            background: #f0f9ff;
+        }
+
+        .orientation-option.selected {
+            border-color: #00b4db;
+            background: #e3f2fd;
+        }
+
+        @media (max-width: 1200px) {
+            .calendar-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .calendar-grid {
+                grid-template-columns: repeat(2, 1fr);
+                padding: 15px;
+                gap: 6px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .calendar-day {
+                min-height: 150px;
+                padding: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .calendar-grid {
+                grid-template-columns: 1fr;
+            }
+
+            body {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 CRONOGRAMA DE LIMPIEZA MENSUAL</h1>
+            <p id="currentMonthYear">Cargando...</p>
+        </div>
+
+        <div class="controls">
+            <div class="date-controls">
+                <label>Fecha inicio (Lunes):</label>
+                <input type="date" id="startDate" value="2025-11-03">
+                <button class="btn btn-primary" id="applyDateBtn">Aplicar Fecha</button>
+            </div>
+
+            <div class="user-info" id="userInfo">
+                <button class="btn btn-primary" id="loginBtn">🔐 Iniciar Sesión</button>
+            </div>
+
+            <div class="font-controls">
+                <select class="font-select" id="fontFamilySelect">
+                    <option value="Arial">Arial</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                </select>
+                <button class="font-btn" id="fontDecreaseBtn" title="Disminuir fuente">A-</button>
+                <button class="font-btn" id="fontIncreaseBtn" title="Aumentar fuente">A+</button>
+            </div>
+
+            <div>
+                <button class="btn btn-success" id="downloadBtn">📥 Descargar Imagen</button>
+                <button class="btn btn-primary" id="updateExcelBtn">💾 Actualizar Excel</button>
+            </div>
+        </div>
+
+        <div id="statusMessage"></div>
+
+        <div class="file-upload-section" id="fileUploadSection" style="display: none;">
+            <h3>📁 Cargar Archivo Excel</h3>
+            <p>No se encontró el archivo "Limpieza_igle.xlsx" en la misma carpeta. Por favor, cargue el archivo manualmente:</p>
+            <div class="file-input-container">
+                <input type="file" id="excelFile" accept=".xlsx, .xls">
+                <label for="excelFile" class="file-input-label">Seleccionar Archivo Excel</label>
+                <button class="btn btn-primary" id="loadExcelBtn">Cargar</button>
+            </div>
+        </div>
+
+       
+
+        <div id="calendarGrid" class="calendar-grid">
+            <div class="drag-info" id="dragInfo">
+                ⬆️ Buscando archivo Excel en la misma carpeta...
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE LOGIN -->
+    <div class="login-modal" id="loginModal">
+        <div class="login-box">
+            <h2>Iniciar Sesión</h2>
+            <div class="form-group">
+                <label>Usuario:</label>
+                <input type="text" id="username" placeholder="Ingrese su usuario">
+            </div>
+            <div class="form-group">
+                <label>Contraseña:</label>
+                <input type="password" id="password" placeholder="Ingrese su contraseña">
+            </div>
+            <button class="btn btn-primary" style="width: 100%;" id="loginSubmit">Ingresar</button>
+            <button class="btn btn-danger" style="width: 100%; margin-top: 8px;" id="loginCancel">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE ORIENTACIÓN PARA DESCARGA -->
+    <div class="orientation-modal" id="orientationModal">
+        <div class="orientation-box">
+            <h2>Seleccione la orientación</h2>
+            <div class="orientation-options">
+                <div class="orientation-option" data-orientation="horizontal">
+                    📄 Horizontal
+                </div>
+                <div class="orientation-option" data-orientation="vertical">
+                    📄 Vertical
+                </div>
+            </div>
+            <button class="btn btn-primary" id="confirmDownloadBtn">Descargar</button>
+            <button class="btn btn-danger" id="cancelDownloadBtn" style="margin-top: 10px;">Cancelar</button>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let persons = [];
+        let isLoggedIn = false;
+        let currentUser = null;
+        let currentExcelData = null;
+        let originalExcelStructure = null;
+        let currentExcelFile = null;
+        let selectedOrientation = 'horizontal';
+        
+        const EXCEL_FILENAME = 'Limpieza_igle.xlsx';
+        
+        // Credenciales de usuario (se cargarán desde Excel)
+        let VALID_USERS = {};
+
+        let supervisorNames = {
+            '1': '', '2': '', '3': '', '4': ''
+        };
+        let currentFontSize = 'md';
+        let currentFontFamily = 'Arial';
+        
+        let scheduleData = {
+            groups: [
+                { name: 'Supervisoras grupo #1', color: '#ff6b9d', days: [] },
+                { name: 'Supervisoras grupo #2', color: '#4ecdc4', days: [] },
+                { name: 'Supervisoras grupo #3', color: '#95e1d3', days: [] },
+                { name: 'Supervisoras grupo #4', color: '#ffd166', days: [] }
+            ],
+            startDate: null
+        };
+
+        // Función para verificar si un día tiene solo nombres "Vacio"
+        function hasOnlyVacioNames(dayData) {
+            return dayData.people.length > 0 && 
+                   dayData.people.every(person => 
+                       person.toLowerCase().includes('vacio') || 
+                       person.trim() === 'Vacio'
+                   );
+        }
+
+        // Función para ocultar automáticamente días con solo "Vacio"
+        function autoHideVacioDays() {
+            if (!isLoggedIn) return;
+            
+            let hiddenCount = 0;
+            scheduleData.groups.forEach(group => {
+                group.days.forEach(day => {
+                    if (hasOnlyVacioNames(day) && !day.hidden) {
+                        day.hidden = true;
+                        hiddenCount++;
+                    }
+                });
+            });
+            
+            if (hiddenCount > 0) {
+                initSchedule();
+                showStatus(`${hiddenCount} días con "Vacio" ocultados automáticamente`);
+            }
+        }
+
+        
+            
+// Función para procesar usuarios desde Excel
+function processUsersFromExcel(workbook) {
+    VALID_USERS = {};
+    
+    // Buscar específicamente en la hoja "Usuario" por datos de usuarios
+    const userSheetName = workbook.SheetNames.find(name => 
+        name.toLowerCase() === 'usuario'
+    );
+
+    if (userSheetName) {
+        const sheet = workbook.Sheets[userSheetName];
+        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        
+        if (data.length > 0) {
+            // Si los datos vienen en una sola columna (usuario y contraseña juntos)
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
+                if (row && row[0]) {
+                    const userData = row[0].toString().trim();
+                    
+                    // Intentar separar usuario y contraseña por espacios múltiples
+                    const parts = userData.split(/\s+/);
+                    
+                    if (parts.length >= 2) {
+                        const username = parts[0].trim();
+                        const password = parts[1].trim();
+                        
+                        if (username && password) {
+                            VALID_USERS[username] = password;
+                            console.log(`Usuario cargado: ${username} - Contraseña: ${password}`);
+                        }
+                    } else if (parts.length === 1) {
+                        // Si solo hay una parte, usar como usuario y contraseña por defecto
+                        const username = parts[0].trim();
+                        if (username) {
+                            VALID_USERS[username] = creacionesk + "k123k"; // Contraseña por defecto
+                            console.log(`Usuario cargado (contraseña por defecto): ${username}`);
+                        }
+                    }
+                }
+            }
+            
+            console.log('Total de usuarios cargados:', Object.keys(VALID_USERS).length);
+        }
+    } else {
+        console.log('No se encontró la hoja "Usuario" en el Excel');
+        showStatus('No se encontró la hoja "Usuario" en el Excel', 'error');
+    }
+}
+
+
+
+        // Cargar Excel automáticamente
+        async function loadExcelAutomatically() {
+            try {
+                showStatus('Buscando archivo Excel...');
+                
+                const dragInfo = document.getElementById('dragInfo');
+                dragInfo.textContent = 'Buscando ' + EXCEL_FILENAME + '...';
+                
+                try {
+                    const response = await fetch(EXCEL_FILENAME);
+                    
+                    if (response.ok) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                        currentExcelData = workbook;
+                        currentExcelFile = EXCEL_FILENAME;
+                        
+                        originalExcelStructure = {};
+                        workbook.SheetNames.forEach(sheetName => {
+                            originalExcelStructure[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                        });
+                        
+                        processUsersFromExcel(workbook);
+                        processExcelData(workbook);
+                        showStatus('Base de datos cargada correctamente desde ' + EXCEL_FILENAME);
+                        return;
+                    }
+                } catch (error) {
+                    console.log('No se pudo cargar desde servidor local:', error);
+                }
+                
+                try {
+                    const githubUrl = window.location.origin + '/' + EXCEL_FILENAME;
+                    const response = await fetch(githubUrl);
+                    
+                    if (response.ok) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                        currentExcelData = workbook;
+                        currentExcelFile = EXCEL_FILENAME;
+                        
+                        originalExcelStructure = {};
+                        workbook.SheetNames.forEach(sheetName => {
+                            originalExcelStructure[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                        });
+                        
+                        processUsersFromExcel(workbook);
+                        processExcelData(workbook);
+                        showStatus('Base de datos cargada correctamente desde GitHub');
+                        return;
+                    }
+                } catch (error) {
+                    console.log('No se pudo cargar desde GitHub:', error);
+                }
+                
+                dragInfo.textContent = 'No se encontró ' + EXCEL_FILENAME + ' automáticamente. Use el botón de carga manual.';
+                document.getElementById('fileUploadSection').style.display = 'block';
+                
+            } catch (error) {
+                console.log('Error en carga automática:', error);
+                const dragInfo = document.getElementById('dragInfo');
+                dragInfo.textContent = 'Error al buscar ' + EXCEL_FILENAME + '. Use el botón de carga manual.';
+                document.getElementById('fileUploadSection').style.display = 'block';
+            }
+        }
+
+        // Cargar Excel manualmente
+        function loadExcelManually(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const arrayBuffer = e.target.result;
+                        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                        currentExcelData = workbook;
+                        currentExcelFile = file.name;
+                        
+                        originalExcelStructure = {};
+                        workbook.SheetNames.forEach(sheetName => {
+                            originalExcelStructure[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                        });
+                        
+                        processUsersFromExcel(workbook);
+                        processExcelData(workbook);
+                        showStatus('Archivo Excel cargado correctamente');
+                        document.getElementById('fileUploadSection').style.display = 'none';
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                reader.onerror = function() {
+                    reject(new Error('Error al leer el archivo'));
+                };
+                
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Mostrar mensaje de estado
+        function showStatus(message, type = 'success') {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 4000);
+        }
+
+        // Aplicar tamaño de fuente y familia
+        function applyFontStyles() {
+            const calendarGrid = document.getElementById('calendarGrid');
+            calendarGrid.className = `calendar-grid font-${currentFontSize}`;
+            calendarGrid.style.fontFamily = currentFontFamily;
+            
+            document.querySelectorAll('.person-item, .day-header').forEach(el => {
+                el.style.fontFamily = currentFontFamily;
+            });
+        }
+
+        // Procesar nombres de supervisoras
+        function processSupervisorNames() {
+            supervisorNames = {'1': '', '2': '', '3': '', '4': ''};
+            
+            if (persons.length > 0) {
+                persons.forEach(person => {
+                    if (person.supervisor && person.supervisor.trim() !== '') {
+                        const supervisorNum = person.supervisor.trim();
+                        if (supervisorNames.hasOwnProperty(supervisorNum)) {
+                            if (supervisorNames[supervisorNum] === '') {
+                                supervisorNames[supervisorNum] = person.name;
+                            } else {
+                                supervisorNames[supervisorNum] += ' - ' + person.name;
+                            }
+                        }
+                    }
+                });
+            }
+            
+            scheduleData.groups[0].name = `Supervisoras grupo #1 ${supervisorNames['1'] || ''}`;
+            scheduleData.groups[1].name = `Supervisoras grupo #2 ${supervisorNames['2'] || ''}`;
+            scheduleData.groups[2].name = `Supervisoras grupo #3 ${supervisorNames['3'] || ''}`;
+            scheduleData.groups[3].name = `Supervisoras grupo #4 ${supervisorNames['4'] || ''}`;
+        }
+
+        // Procesar datos del Excel
+        function processExcelData(workbook) {
+            try {
+                const scheduleSheetName = workbook.SheetNames.find(name => 
+                    name.toLowerCase().includes('cronograma') || 
+                    name.toLowerCase().includes('limpieza') ||
+                    name.toLowerCase().includes('personas')
+                ) || workbook.SheetNames[0];
+
+                if (scheduleSheetName) {
+                    const scheduleSheet = workbook.Sheets[scheduleSheetName];
+                    const scheduleDataRaw = XLSX.utils.sheet_to_json(scheduleSheet, { header: 1 });
+                    
+                    persons = [];
+                    
+                    let nameCol = -1;
+                    let supervisorCol = -1;
+                    let statusCol = -1;
+                    
+                    if (scheduleDataRaw.length > 0) {
+                        const headerRow = scheduleDataRaw[0];
+                        
+                        for (let i = 0; i < headerRow.length; i++) {
+                            const cell = headerRow[i] ? headerRow[i].toString().toLowerCase() : '';
+                            if (cell.includes('nombre') || cell.includes('persona')) nameCol = i;
+                            if (cell.includes('supervisora')) supervisorCol = i;
+                            if (cell.includes('estado')) statusCol = i;
+                        }
+                        
+                        for (let i = 1; i < scheduleDataRaw.length; i++) {
+                            const row = scheduleDataRaw[i];
+                            if (row && row[nameCol] && row[nameCol].toString().trim() !== '') {
+                                const name = row[nameCol].toString().trim();
+                                const supervisor = supervisorCol !== -1 && row[supervisorCol] ? row[supervisorCol].toString().trim() : '';
+                                const status = statusCol !== -1 && row[statusCol] ? row[statusCol].toString().trim() : '';
+                                
+                                persons.push({ 
+                                    name: name, 
+                                    supervisor: supervisor,
+                                    status: status
+                                });
+                            }
+                        }
+                    }
+                }
+
+                processSupervisorNames();
+
+                if (!scheduleData.startDate) {
+                    scheduleData.startDate = new Date('2025-11-03');
+                }
+                
+                updateDateInput();
+                initialize6x4Structure();
+                
+                // Ocultar automáticamente días con solo "Vacio" al cargar
+                autoHideVacioDays();
+                
+                updateMonthYear();
+                initSchedule();
+                
+            } catch (error) {
+                console.error('Error procesando Excel:', error);
+                showStatus('Error al procesar el Excel: ' + error.message, 'error');
+            }
+        }
+
+        // Inicializar estructura
+        function initialize6x4Structure() {
+            const targetDays = [1, 3, 4, 5, 6, 0];
+            const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            
+            scheduleData.groups.forEach((group, groupIndex) => {
+                group.days = [];
+                
+                let currentDate = new Date(scheduleData.startDate);
+                currentDate.setDate(currentDate.getDate() + (groupIndex * 7));
+                
+                while (currentDate.getDay() !== 1) {
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                for (let i = 0; i < 6; i++) {
+                    while (!targetDays.includes(currentDate.getDay())) {
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                    
+                    const dayName = dayNames[currentDate.getDay()];
+                    const dayNumber = currentDate.getDate();
+                    const month = currentDate.getMonth() + 1;
+                    const year = currentDate.getFullYear();
+                    
+                    const dateString = `${dayName} ${dayNumber}/${month}/${year}`;
+                    
+                    const people = [];
+                    if (persons.length > 0) {
+                        const startIndex = (groupIndex * 12 + i * 2) % persons.length;
+                        for (let j = 0; j < 2; j++) {
+                            const personIndex = (startIndex + j) % persons.length;
+                            if (persons[personIndex] && persons[personIndex].name.trim() !== '') {
+                                people.push(persons[personIndex].name);
+                            }
+                        }
+                    }
+                    
+                    const hasOnlyVacio = people.length > 0 && 
+                                        people.every(person => 
+                                            person.toLowerCase().includes('vacio') || 
+                                            person.trim() === 'Vacio'
+                                        );
+                    
+                    group.days.push({
+                        day: dateString,
+                        people: people,
+                        date: new Date(currentDate),
+                        originalDate: new Date(currentDate),
+                        isEmpty: people.length === 0,
+                        hidden: hasOnlyVacio
+                    });
+                    
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            });
+        }
+
+        // Obtener el siguiente cuadro
+        function getNextDay(groupIdx, dayIdx) {
+            const group = scheduleData.groups[groupIdx];
+            
+            if (dayIdx < group.days.length - 1) {
+                return { groupIdx: groupIdx, dayIdx: dayIdx + 1 };
+            }
+            
+            if (groupIdx < scheduleData.groups.length - 1) {
+                return { groupIdx: groupIdx + 1, dayIdx: 0 };
+            }
+            
+            return { groupIdx: 0, dayIdx: 0 };
+        }
+
+        // Obtener el cuadro anterior
+        function getPreviousDay(groupIdx, dayIdx) {
+            const group = scheduleData.groups[groupIdx];
+            
+            if (dayIdx > 0) {
+                return { groupIdx: groupIdx, dayIdx: dayIdx - 1 };
+            }
+            
+            if (groupIdx > 0) {
+                const prevGroup = scheduleData.groups[groupIdx - 1];
+                return { groupIdx: groupIdx - 1, dayIdx: prevGroup.days.length - 1 };
+            }
+            
+            const lastGroup = scheduleData.groups[scheduleData.groups.length - 1];
+            return { groupIdx: scheduleData.groups.length - 1, dayIdx: lastGroup.days.length - 1 };
+        }
+
+        // Mover nombres hacia la derecha
+        function shiftNamesRight(startGroupIdx, startDayIdx) {
+            let currentGroupIdx = startGroupIdx;
+            let currentDayIdx = startDayIdx;
+            let movedPerson = null;
+            
+            let searchGroupIdx = startGroupIdx;
+            let searchDayIdx = startDayIdx;
+            
+            while (true) {
+                const nextDay = getNextDay(searchGroupIdx, searchDayIdx);
+                
+                if (nextDay.groupIdx === startGroupIdx && nextDay.dayIdx === startDayIdx) {
+                    break;
+                }
+                
+                const nextDayData = scheduleData.groups[nextDay.groupIdx].days[nextDay.dayIdx];
+                if (nextDayData.people.length > 0) {
+                    movedPerson = nextDayData.people.shift();
+                    break;
+                }
+                
+                searchGroupIdx = nextDay.groupIdx;
+                searchDayIdx = nextDay.dayIdx;
+            }
+            
+            if (movedPerson) {
+                const startDay = scheduleData.groups[startGroupIdx].days[startDayIdx];
+                startDay.people.push(movedPerson);
+                startDay.isEmpty = false;
+            }
+            
+            initSchedule();
+            showStatus(movedPerson ? 'Persona agregada - Nombres movidos hacia la derecha' : 'No hay personas disponibles para mover');
+        }
+
+        // Mover nombres hacia la izquierda
+        function shiftNamesLeft(startGroupIdx, startDayIdx) {
+            const startDay = scheduleData.groups[startGroupIdx].days[startDayIdx];
+            
+            if (startDay.people.length === 0) {
+                showStatus('No hay personas para quitar en este cuadro', 'error');
+                return;
+            }
+            
+            const removedPerson = startDay.people.pop();
+            startDay.isEmpty = startDay.people.length === 0;
+            
+            let currentGroupIdx = startGroupIdx;
+            let currentDayIdx = startDayIdx;
+            let placed = false;
+            
+            while (!placed) {
+                const nextDay = getNextDay(currentGroupIdx, currentDayIdx);
+                
+                const nextDayData = scheduleData.groups[nextDay.groupIdx].days[nextDay.dayIdx];
+                if (nextDayData.people.length < 4) {
+                    nextDayData.people.unshift(removedPerson);
+                    nextDayData.isEmpty = false;
+                    placed = true;
+                    break;
+                }
+                
+                currentGroupIdx = nextDay.groupIdx;
+                currentDayIdx = nextDay.dayIdx;
+                
+                if (currentGroupIdx === startGroupIdx && currentDayIdx === startDayIdx) {
+                    showStatus('No hay espacio disponible en otros cuadros', 'error');
+                    return;
+                }
+            }
+            
+            initSchedule();
+            showStatus(`Persona "${removedPerson}" movida a otro cuadro`);
+        }
+
+        // Agregar persona
+        function addPerson(groupIdx, dayIdx) {
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            
+            if (dayData.people.length >= 4) {
+                showStatus('Máximo 4 personas por día', 'error');
+                return;
+            }
+            
+            shiftNamesRight(groupIdx, dayIdx);
+        }
+
+        // Quitar persona
+        function removePerson(groupIdx, dayIdx) {
+            shiftNamesLeft(groupIdx, dayIdx);
+        }
+
+        // Alternar visibilidad del día
+        function toggleDayVisibility(groupIdx, dayIdx) {
+            if (!isLoggedIn) {
+                showStatus('Debe iniciar sesión para ocultar/mostrar días', 'error');
+                return;
+            }
+            
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            dayData.hidden = !dayData.hidden;
+            
+            initSchedule();
+            showStatus(`Día ${dayData.hidden ? 'oculto' : 'mostrado'} correctamente`);
+        }
+
+        // Drag and drop de nombres individuales
+        function handlePersonDragStart(e) {
+            if (!isLoggedIn) return;
+            
+            const personElement = this;
+            const groupIdx = parseInt(personElement.closest('.calendar-day').dataset.group);
+            const dayIdx = parseInt(personElement.closest('.calendar-day').dataset.day);
+            const personIndex = Array.from(personElement.parentNode.children).indexOf(personElement);
+            
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                sourceGroup: groupIdx,
+                sourceDay: dayIdx,
+                personIndex: personIndex,
+                personName: personElement.textContent
+            }));
+            
+            personElement.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handlePersonDragEnd(e) {
+            document.querySelectorAll('.person-item').forEach(item => {
+                item.classList.remove('dragging', 'drag-over', 'drop-above', 'drop-below');
+            });
+        }
+
+        function handlePersonDragOver(e) {
+            if (!isLoggedIn) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+            
+            this.classList.remove('drop-above', 'drop-below');
+            
+            if (y < height / 2) {
+                this.classList.add('drop-above');
+            } else {
+                this.classList.add('drop-below');
+            }
+        }
+
+        function handlePersonDragEnter(e) {
+            if (!isLoggedIn) return;
+            e.preventDefault();
+            this.classList.add('drag-over');
+        }
+
+        function handlePersonDragLeave(e) {
+            this.classList.remove('drag-over', 'drop-above', 'drop-below');
+        }
+
+        function handlePersonDrop(e) {
+            if (!isLoggedIn) return;
+            
+            e.preventDefault();
+            this.classList.remove('drag-over', 'drop-above', 'drop-below');
+            
+            const dragData = JSON.parse(e.dataTransfer.getData('application/json'));
+            const targetGroupIdx = parseInt(this.closest('.calendar-day').dataset.group);
+            const targetDayIdx = parseInt(this.closest('.calendar-day').dataset.day);
+            
+            const sourceDay = scheduleData.groups[dragData.sourceGroup].days[dragData.sourceDay];
+            const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            if (targetDay.people.length >= 4) {
+                showStatus('No se puede mover: día destino ya tiene 4 personas', 'error');
+                return;
+            }
+            
+            const movedPerson = sourceDay.people.splice(dragData.personIndex, 1)[0];
+            
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+            const targetIndex = Array.from(this.parentNode.children).indexOf(this);
+            
+            if (y < height / 2) {
+                targetDay.people.splice(targetIndex, 0, movedPerson);
+            } else {
+                targetDay.people.splice(targetIndex + 1, 0, movedPerson);
+            }
+            
+            sourceDay.isEmpty = sourceDay.people.length === 0;
+            targetDay.isEmpty = false;
+            
+            initSchedule();
+            showStatus(`Persona "${movedPerson}" movida correctamente`);
+        }
+
+        // Inicializar el cronograma
+        function initSchedule() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            if (scheduleData.groups[0].days.length === 0) {
+                const dragInfo = document.createElement('div');
+                dragInfo.className = 'drag-info';
+                dragInfo.textContent = 'No hay datos disponibles. Cargue un archivo Excel.';
+                grid.appendChild(dragInfo);
+                return;
+            }
+
+            scheduleData.groups.forEach((group, groupIdx) => {
+                const groupHeader = document.createElement('div');
+                groupHeader.className = 'group-header';
+                groupHeader.textContent = group.name;
+                groupHeader.style.background = group.color;
+                grid.appendChild(groupHeader);
+
+                group.days.forEach((dayData, dayIdx) => {
+                    if (hasOnlyVacioNames(dayData) && !dayData.hidden && isLoggedIn) {
+                        dayData.hidden = true;
+                    }
+                    
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = `calendar-day ${dayData.isEmpty ? 'empty' : ''} ${dayData.hidden ? 'hidden' : ''}`;
+                    dayDiv.dataset.group = groupIdx;
+                    dayDiv.dataset.day = dayIdx;
+                    
+                    if (dayData.day.toLowerCase().includes('domingo')) {
+                        dayDiv.classList.add('sunday');
+                    }
+
+                    const header = document.createElement('div');
+                    header.className = 'day-header';
+                    header.textContent = dayData.day;
+
+                    const content = document.createElement('div');
+                    content.className = 'day-content';
+                    
+                    if (dayData.hidden) {
+                        const noActivityDiv = document.createElement('div');
+                        noActivityDiv.className = 'no-activity';
+                        noActivityDiv.textContent = 'Sin actividad';
+                        content.appendChild(noActivityDiv);
+                    } else if (dayData.isEmpty) {
+                        const noActivityDiv = document.createElement('div');
+                        noActivityDiv.className = 'no-activity';
+                        noActivityDiv.textContent = 'Sin actividad';
+                        content.appendChild(noActivityDiv);
+                    } else {
+                        const personList = document.createElement('div');
+                        personList.className = 'person-list';
+                        
+                        if (dayData.people.length === 4) {
+                            const morningLabel = document.createElement('div');
+                            morningLabel.className = 'time-label';
+                            morningLabel.textContent = 'por la mañana';
+                            personList.appendChild(morningLabel);
+                            
+                            dayData.people.slice(0, 2).forEach((person, index) => {
+                                const personDiv = document.createElement('div');
+                                personDiv.className = 'person-item';
+                                personDiv.textContent = person;
+                                personDiv.draggable = isLoggedIn;
+                                
+                                if (isLoggedIn) {
+                                    personDiv.addEventListener('dragstart', handlePersonDragStart);
+                                    personDiv.addEventListener('dragend', handlePersonDragEnd);
+                                    personDiv.addEventListener('dragover', handlePersonDragOver);
+                                    personDiv.addEventListener('drop', handlePersonDrop);
+                                    personDiv.addEventListener('dragenter', handlePersonDragEnter);
+                                    personDiv.addEventListener('dragleave', handlePersonDragLeave);
+                                }
+                                
+                                personList.appendChild(personDiv);
+                            });
+                            
+                            const afternoonLabel = document.createElement('div');
+                            afternoonLabel.className = 'time-label';
+                            afternoonLabel.textContent = 'por la tarde';
+                            personList.appendChild(afternoonLabel);
+                            
+                            dayData.people.slice(2, 4).forEach((person, index) => {
+                                const personDiv = document.createElement('div');
+                                personDiv.className = 'person-item';
+                                personDiv.textContent = person;
+                                personDiv.draggable = isLoggedIn;
+                                
+                                if (isLoggedIn) {
+                                    personDiv.addEventListener('dragstart', handlePersonDragStart);
+                                    personDiv.addEventListener('dragend', handlePersonDragEnd);
+                                    personDiv.addEventListener('dragover', handlePersonDragOver);
+                                    personDiv.addEventListener('drop', handlePersonDrop);
+                                    personDiv.addEventListener('dragenter', handlePersonDragEnter);
+                                    personDiv.addEventListener('dragleave', handlePersonDragLeave);
+                                }
+                                
+                                personList.appendChild(personDiv);
+                            });
+                        } else {
+                            dayData.people.forEach((person, index) => {
+                                const personDiv = document.createElement('div');
+                                personDiv.className = 'person-item';
+                                personDiv.textContent = person;
+                                personDiv.draggable = isLoggedIn;
+                                
+                                if (isLoggedIn) {
+                                    personDiv.addEventListener('dragstart', handlePersonDragStart);
+                                    personDiv.addEventListener('dragend', handlePersonDragEnd);
+                                    personDiv.addEventListener('dragover', handlePersonDragOver);
+                                    personDiv.addEventListener('drop', handlePersonDrop);
+                                    personDiv.addEventListener('dragenter', handlePersonDragEnter);
+                                    personDiv.addEventListener('dragleave', handlePersonDragLeave);
+                                }
+                                
+                                personList.appendChild(personDiv);
+                            });
+                        }
+                        
+                        content.appendChild(personList);
+                    }
+
+                    if (dayData.people.length > 0 && !dayData.hidden) {
+                        const countDiv = document.createElement('div');
+                        countDiv.className = 'person-count';
+                        countDiv.textContent = dayData.people.length;
+                        dayDiv.appendChild(countDiv);
+                    }
+
+                    const actionButtons = document.createElement('div');
+                    actionButtons.className = 'day-actions';
+                    
+                    if (isLoggedIn) {
+                        const addBtn = document.createElement('button');
+                        addBtn.className = 'action-btn add-btn';
+                        addBtn.innerHTML = '+';
+                        addBtn.title = 'Agregar persona';
+                        addBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            addPerson(groupIdx, dayIdx);
+                        };
+                        actionButtons.appendChild(addBtn);
+                    }
+                    
+                    if (isLoggedIn) {
+                        const removeBtn = document.createElement('button');
+                        removeBtn.className = 'action-btn remove-btn';
+                        removeBtn.innerHTML = '-';
+                        removeBtn.title = 'Quitar última persona';
+                        removeBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            removePerson(groupIdx, dayIdx);
+                        };
+                        actionButtons.appendChild(removeBtn);
+                    }
+                    
+                    if (isLoggedIn) {
+                        const toggleBtn = document.createElement('button');
+                        toggleBtn.className = 'action-btn toggle-btn';
+                        toggleBtn.innerHTML = dayData.hidden ? '👁️' : '👁️';
+                        toggleBtn.title = dayData.hidden ? 'Mostrar día' : 'Ocultar día';
+                        toggleBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            toggleDayVisibility(groupIdx, dayIdx);
+                        };
+                        actionButtons.appendChild(toggleBtn);
+                    }
+
+                    dayDiv.appendChild(actionButtons);
+
+                    dayDiv.draggable = isLoggedIn;
+                    
+                    if (isLoggedIn) {
+                        dayDiv.addEventListener('dragstart', handleDayDragStart);
+                        dayDiv.addEventListener('dragend', handleDayDragEnd);
+                        dayDiv.addEventListener('dragover', handleDragOver);
+                        dayDiv.addEventListener('drop', handleDayDrop);
+                        dayDiv.addEventListener('dragenter', handleDragEnter);
+                        dayDiv.addEventListener('dragleave', handleDragLeave);
+                    }
+
+                    dayDiv.appendChild(header);
+                    dayDiv.appendChild(content);
+                    grid.appendChild(dayDiv);
+                });
+            });
+
+            applyFontStyles();
+        }
+
+        // Drag & drop de días completos
+        let draggedDayElement = null;
+        let draggedDayData = null;
+
+        function handleDayDragStart(e) {
+            if (!isLoggedIn) return;
+            
+            draggedDayElement = this;
+            const groupIdx = parseInt(this.dataset.group);
+            const dayIdx = parseInt(this.dataset.day);
+            
+            draggedDayData = {
+                groupIdx: groupIdx,
+                dayIdx: dayIdx,
+                data: JSON.parse(JSON.stringify(scheduleData.groups[groupIdx].days[dayIdx]))
+            };
+            
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', '');
+        }
+
+        function handleDayDragEnd(e) {
+            if (draggedDayElement) {
+                draggedDayElement.classList.remove('dragging');
+            }
+            draggedDayElement = null;
+            draggedDayData = null;
+            
+            document.querySelectorAll('.calendar-day.drag-over').forEach(day => {
+                day.classList.remove('drag-over');
+            });
+        }
+
+        function handleDragOver(e) {
+            if (!isLoggedIn) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            if (!isLoggedIn) return;
+            e.preventDefault();
+            this.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDayDrop(e) {
+            if (!isLoggedIn || !draggedDayData) return;
+            
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            const targetGroupIdx = parseInt(this.dataset.group);
+            const targetDayIdx = parseInt(this.dataset.day);
+            
+            if (draggedDayData.groupIdx === targetGroupIdx && draggedDayData.dayIdx === targetDayIdx) {
+                return;
+            }
+            
+            const sourceData = scheduleData.groups[draggedDayData.groupIdx].days[draggedDayData.dayIdx];
+            const targetData = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            const sourceOriginalDate = new Date(sourceData.originalDate);
+            const targetOriginalDate = new Date(targetData.originalDate);
+            
+            const tempPeople = [...sourceData.people];
+            const tempIsEmpty = sourceData.isEmpty;
+            const tempHidden = sourceData.hidden;
+            
+            sourceData.people = [...targetData.people];
+            sourceData.isEmpty = targetData.isEmpty;
+            sourceData.hidden = targetData.hidden;
+            
+            targetData.people = tempPeople;
+            targetData.isEmpty = tempIsEmpty;
+            targetData.hidden = tempHidden;
+            
+            updateDayHeader(sourceData, sourceOriginalDate);
+            updateDayHeader(targetData, targetOriginalDate);
+            
+            initSchedule();
+            showStatus('Día movido correctamente');
+        }
+
+        function updateDayHeader(dayData, date) {
+            const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            const dayName = dayNames[date.getDay()];
+            const dayNumber = date.getDate();
+            const month = date.getMonth() + 1;
+            const year = date.getFullYear();
+            
+            dayData.day = `${dayName} ${dayNumber}/${month}/${year}`;
+            dayData.date = new Date(date);
+            dayData.originalDate = new Date(date);
+        }
+
+        // Sistema de login seguro
+        document.getElementById('loginSubmit').addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showStatus('Ingrese usuario y contraseña', 'error');
+                return;
+            }
+
+            if (Object.keys(VALID_USERS).length === 0) {
+                showStatus('No hay usuarios configurados en el sistema', 'error');
+                return;
+            }
+
+            if (VALID_USERS[username] && VALID_USERS[username] === password) {
+                isLoggedIn = true;
+                currentUser = username;
+                document.getElementById('loginModal').classList.remove('active');
+                document.getElementById('userInfo').innerHTML = `
+                    <span>👤 ${username}</span>
+                    <button class="btn btn-danger" id="logoutBtn">Cerrar Sesión</button>
+                `;
+                
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    isLoggedIn = false;
+                    currentUser = null;
+                    document.getElementById('userInfo').innerHTML = `
+                        <button class="btn btn-primary" id="loginBtn">🔐 Iniciar Sesión</button>
+                    `;
+                    document.getElementById('loginBtn').addEventListener('click', () => {
+                        document.getElementById('loginModal').classList.add('active');
+                    });
+                    initSchedule();
+                    showStatus('Sesión cerrada correctamente');
+                });
+
+                autoHideVacioDays();
+                
+                initSchedule();
+                showStatus(`Bienvenido/a ${username}`);
+            } else {
+                showStatus('Usuario o contraseña incorrectos', 'error');
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+                document.getElementById('username').focus();
+            }
+        });
+
+        // Actualizar Excel
+        document.getElementById('updateExcelBtn').addEventListener('click', function() {
+            if (!currentExcelData) {
+                showStatus('No hay archivo Excel cargado para actualizar', 'error');
+                return;
+            }
+
+            try {
+                const scheduleSheetName = currentExcelData.SheetNames.find(name => 
+                    name.toLowerCase().includes('cronograma') || 
+                    name.toLowerCase().includes('limpieza')
+                ) || currentExcelData.SheetNames[0];
+
+                const newData = originalExcelStructure ? [...originalExcelStructure[scheduleSheetName]] : [];
+                
+                if (newData.length === 0) {
+                    newData.push(['Nombre', 'Supervisora', 'Fecha Asignada', 'Estado']);
+                }
+                
+                let nameCol = -1, supervisorCol = -1, dateCol = -1, statusCol = -1;
+                if (newData.length > 0) {
+                    const headerRow = newData[0];
+                    for (let i = 0; i < headerRow.length; i++) {
+                        const cell = headerRow[i] ? headerRow[i].toString().toLowerCase() : '';
+                        if (cell.includes('nombre')) nameCol = i;
+                        if (cell.includes('supervisora')) supervisorCol = i;
+                        if (cell.includes('fecha') || cell.includes('día')) dateCol = i;
+                        if (cell.includes('estado')) statusCol = i;
+                    }
+                    
+                    if (statusCol === -1) {
+                        statusCol = headerRow.length;
+                        newData[0].push('Estado');
+                    }
+                }
+                
+                const headerRow = newData[0];
+                newData.splice(1, newData.length - 1);
+                
+                scheduleData.groups.forEach((group, groupIndex) => {
+                    group.days.forEach(day => {
+                        const shouldBeHidden = hasOnlyVacioNames(day);
+                        if (shouldBeHidden && !day.hidden && isLoggedIn) {
+                            day.hidden = true;
+                        }
+                        
+                        if (day.people.length === 0) {
+                            const newRow = new Array(headerRow.length).fill('');
+                            
+                            if (nameCol !== -1) newRow[nameCol] = 'Vacio';
+                            if (dateCol !== -1) newRow[dateCol] = day.day;
+                            if (statusCol !== -1) {
+                                newRow[statusCol] = day.hidden ? 'Oculto (Vacio)' : 'Activo';
+                            }
+                            
+                            newData.push(newRow);
+                        } else {
+                            day.people.forEach(person => {
+                                if (person && person.trim() !== '') {
+                                    const newRow = new Array(headerRow.length).fill('');
+                                    
+                                    if (nameCol !== -1) newRow[nameCol] = person;
+                                    if (dateCol !== -1) newRow[dateCol] = day.day;
+                                    if (supervisorCol !== -1) {
+                                        const personData = persons.find(p => p.name === person);
+                                        if (personData && personData.supervisor) {
+                                            newRow[supervisorCol] = personData.supervisor;
+                                        } else {
+                                            newRow[supervisorCol] = '';
+                                        }
+                                    }
+                                    if (statusCol !== -1) {
+                                        const status = day.hidden ? 
+                                            (hasOnlyVacioNames(day) ? 'Oculto (Vacio)' : 'Oculto') : 
+                                            'Activo';
+                                        newRow[statusCol] = status;
+                                    }
+                                    
+                                    newData.push(newRow);
+                                }
+                            });
+                        }
+                    });
+                });
+
+                const newWorksheet = XLSX.utils.aoa_to_sheet(newData);
+                currentExcelData.Sheets[scheduleSheetName] = newWorksheet;
+
+                const outputFilename = currentExcelFile || 'Limpieza_igle_actualizado.xlsx';
+                XLSX.writeFile(currentExcelData, outputFilename);
+                showStatus(`Excel actualizado correctamente: ${outputFilename}`);
+                
+            } catch (error) {
+                console.error('Error actualizando Excel:', error);
+                showStatus('Error al actualizar el Excel: ' + error.message, 'error');
+            }
+        });
+
+        function updateDateInput() {
+            const dateInput = document.getElementById('startDate');
+            if (scheduleData.startDate) {
+                dateInput.valueAsDate = scheduleData.startDate;
+            }
+        }
+
+        function updateMonthYear() {
+            if (!scheduleData.startDate) return;
+            
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            
+            const startMonth = monthNames[scheduleData.startDate.getMonth()];
+            const startYear = scheduleData.startDate.getFullYear();
+            
+            const endDate = new Date(scheduleData.startDate);
+            endDate.setDate(endDate.getDate() + 27);
+            const endMonth = monthNames[endDate.getMonth()];
+            const endYear = endDate.getFullYear();
+            
+            document.getElementById('currentMonthYear').textContent = 
+                `${startMonth} ${startYear} - ${endMonth} ${endYear}`;
+        }
+
+        // Event listeners
+        document.getElementById('fontIncreaseBtn').addEventListener('click', () => {
+            const sizes = ['xs', 'sm', 'md', 'lg', 'xl'];
+            const currentIndex = sizes.indexOf(currentFontSize);
+            if (currentIndex < sizes.length - 1) {
+                currentFontSize = sizes[currentIndex + 1];
+                applyFontStyles();
+                showStatus(`Tamaño de fuente: ${currentFontSize.toUpperCase()}`);
+            }
+        });
+
+        document.getElementById('fontDecreaseBtn').addEventListener('click', () => {
+            const sizes = ['xs', 'sm', 'md', 'lg', 'xl'];
+            const currentIndex = sizes.indexOf(currentFontSize);
+            if (currentIndex > 0) {
+                currentFontSize = sizes[currentIndex - 1];
+                applyFontStyles();
+                showStatus(`Tamaño de fuente: ${currentFontSize.toUpperCase()}`);
+            }
+        });
+
+        document.getElementById('fontFamilySelect').addEventListener('change', (e) => {
+            currentFontFamily = e.target.value;
+            applyFontStyles();
+            showStatus(`Fuente cambiada a: ${currentFontFamily}`);
+        });
+
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            document.getElementById('loginModal').classList.add('active');
+        });
+
+        document.getElementById('loginCancel').addEventListener('click', () => {
+            document.getElementById('loginModal').classList.remove('active');
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            document.getElementById('orientationModal').classList.add('active');
+            
+            document.querySelectorAll('.orientation-option').forEach(option => {
+                option.classList.remove('selected');
+                if (option.dataset.orientation === selectedOrientation) {
+                    option.classList.add('selected');
+                }
+            });
+        });
+
+        document.querySelectorAll('.orientation-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.orientation-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                this.classList.add('selected');
+                selectedOrientation = this.dataset.orientation;
+            });
+        });
+
+        document.getElementById('confirmDownloadBtn').addEventListener('click', () => {
+            document.getElementById('orientationModal').classList.remove('active');
+            downloadImage(selectedOrientation);
+        });
+
+        document.getElementById('cancelDownloadBtn').addEventListener('click', () => {
+            document.getElementById('orientationModal').classList.remove('active');
+        });
+
+        function downloadImage(orientation) {
+            document.querySelector('.container').classList.add('download-mode');
+            
+            const config = {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                logging: false
+            };
+            
+            if (orientation === 'vertical') {
+                config.width = document.querySelector('.container').scrollWidth;
+                config.height = document.querySelector('.container').scrollHeight;
+                config.windowWidth = document.querySelector('.container').scrollWidth;
+                config.windowHeight = document.querySelector('.container').scrollHeight;
+            }
+            
+            html2canvas(document.querySelector('.container'), config).then(canvas => {
+                document.querySelector('.container').classList.remove('download-mode');
+                
+                const link = document.createElement('a');
+                link.download = `cronograma-limpieza-${orientation}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showStatus(`Imagen ${orientation} descargada correctamente`);
+            }).catch(error => {
+                document.querySelector('.container').classList.remove('download-mode');
+                console.error('Error al descargar imagen:', error);
+                showStatus('Error al descargar la imagen', 'error');
+            });
+        }
+
+        document.getElementById('applyDateBtn').addEventListener('click', function() {
+            const dateInput = document.getElementById('startDate');
+            const selectedDate = new Date(dateInput.value);
+            
+            if (selectedDate.getDay() !== 1) {
+                showStatus('Por favor seleccione un lunes como fecha de inicio', 'error');
+                return;
+            }
+            
+            const currentNames = [];
+            const currentHiddenStates = [];
+            scheduleData.groups.forEach(group => {
+                group.days.forEach(day => {
+                    currentNames.push([...day.people]);
+                    currentHiddenStates.push(day.hidden);
+                });
+            });
+            
+            scheduleData.startDate = selectedDate;
+            initialize6x4Structure();
+            
+            let nameIndex = 0;
+            let hiddenIndex = 0;
+            scheduleData.groups.forEach(group => {
+                group.days.forEach(day => {
+                    if (nameIndex < currentNames.length && currentNames[nameIndex].length > 0) {
+                        day.people = [...currentNames[nameIndex]];
+                        day.isEmpty = false;
+                    }
+                    if (hiddenIndex < currentHiddenStates.length) {
+                        day.hidden = currentHiddenStates[hiddenIndex];
+                    }
+                    nameIndex++;
+                    hiddenIndex++;
+                });
+            });
+            
+            updateMonthYear();
+            initSchedule();
+            showStatus('Fecha aplicada correctamente - Nombres preservados');
+        });
+
+        document.getElementById('loadExcelBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showStatus('Por favor seleccione un archivo Excel', 'error');
+                return;
+            }
+            
+            showStatus('Cargando archivo Excel...');
+            
+            loadExcelManually(file).catch(error => {
+                console.error('Error cargando Excel manualmente:', error);
+                showStatus('Error al cargar el archivo: ' + error.message, 'error');
+            });
+        });
+
+        // Inicializar
+        loadExcelAutomatically();
+    </script>
+</body>
+</html>
