@@ -610,6 +610,69 @@
                 padding: 8px;
             }
         }
+
+
+
+/* Mejoras para móviles */
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        margin: 2px 0;
+        border: none;
+        border-radius: 4px;
+        background: #00b4db;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    
+    .mobile-menu-btn:hover {
+        background: #0083b0;
+    }
+    
+    .calendar-day {
+        min-height: 140px;
+        touch-action: pan-y;
+    }
+    
+    .person-item {
+        padding: 8px;
+        font-size: 13px;
+        touch-action: none;
+    }
+    
+    .day-actions {
+        position: relative;
+        bottom: auto;
+        right: auto;
+        justify-content: center;
+        margin-top: 8px;
+    }
+    
+    .action-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+    }
+}
+
+/* Indicadores visuales para interacción táctil */
+.calendar-day.touch-active {
+    transform: scale(0.98);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.person-item.touch-active {
+    background: #e3f2fd !important;
+    transform: scale(1.05);
+}
+
+
+
+
     </style>
 </head>
 <body>
@@ -1031,63 +1094,80 @@ function processUsersFromExcel(workbook) {
             }
         }
 
-        // Inicializar estructura
-        function initialize6x4Structure() {
-            const targetDays = [1, 3, 4, 5, 6, 0];
-            const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-            
-            scheduleData.groups.forEach((group, groupIndex) => {
-                group.days = [];
-                
-                let currentDate = new Date(scheduleData.startDate);
-                currentDate.setDate(currentDate.getDate() + (groupIndex * 7));
-                
-                while (currentDate.getDay() !== 1) {
-                    currentDate.setDate(currentDate.getDate() + 1);
-                }
-                
-                for (let i = 0; i < 6; i++) {
-                    while (!targetDays.includes(currentDate.getDay())) {
-                        currentDate.setDate(currentDate.getDate() + 1);
-                    }
-                    
-                    const dayName = dayNames[currentDate.getDay()];
-                    const dayNumber = currentDate.getDate();
-                    const month = currentDate.getMonth() + 1;
-                    const year = currentDate.getFullYear();
-                    
-                    const dateString = `${dayName} ${dayNumber}/${month}/${year}`;
-                    
-                    const people = [];
-                    if (persons.length > 0) {
-                        const startIndex = (groupIndex * 12 + i * 2) % persons.length;
-                        for (let j = 0; j < 2; j++) {
-                            const personIndex = (startIndex + j) % persons.length;
-                            if (persons[personIndex] && persons[personIndex].name.trim() !== '') {
-                                people.push(persons[personIndex].name);
-                            }
-                        }
-                    }
-                    
-                    const hasOnlyVacio = people.length > 0 && 
-                                        people.every(person => 
-                                            person.toLowerCase().includes('vacio') || 
-                                            person.trim() === 'Vacio'
-                                        );
-                    
-                    group.days.push({
-                        day: dateString,
-                        people: people,
-                        date: new Date(currentDate),
-                        originalDate: new Date(currentDate),
-                        isEmpty: people.length === 0,
-                        hidden: hasOnlyVacio
-                    });
-                    
-                    currentDate.setDate(currentDate.getDate() + 1);
-                }
-            });
+       
+
+// Inicializar estructura con soporte para años futuros
+function initialize6x4Structure() {
+    const targetDays = [1, 3, 4, 5, 6, 0]; // Lunes, Miércoles, Jueves, Viernes, Sábado, Domingo
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    
+    // Verificar que la fecha de inicio sea válida y futura
+    if (!scheduleData.startDate || isNaN(scheduleData.startDate.getTime())) {
+        scheduleData.startDate = new Date();
+        // Asegurar que empiece en lunes
+        while (scheduleData.startDate.getDay() !== 1) {
+            scheduleData.startDate.setDate(scheduleData.startDate.getDate() + 1);
         }
+    }
+    
+    scheduleData.groups.forEach((group, groupIndex) => {
+        group.days = [];
+        
+        // Calcular fecha inicial para cada grupo
+        let currentDate = new Date(scheduleData.startDate);
+        currentDate.setDate(currentDate.getDate() + (groupIndex * 7));
+        
+        // Asegurar que empiece en lunes
+        while (currentDate.getDay() !== 1) {
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        for (let i = 0; i < 6; i++) {
+            // Avanzar hasta el siguiente día objetivo
+            while (!targetDays.includes(currentDate.getDay())) {
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            const dayName = dayNames[currentDate.getDay()];
+            const dayNumber = currentDate.getDate();
+            const month = currentDate.getMonth() + 1;
+            const year = currentDate.getFullYear();
+            
+            const dateString = `${dayName} ${dayNumber}/${month}/${year}`;
+            
+            const people = [];
+            if (persons.length > 0) {
+                const startIndex = (groupIndex * 12 + i * 2) % persons.length;
+                for (let j = 0; j < 2; j++) {
+                    const personIndex = (startIndex + j) % persons.length;
+                    if (persons[personIndex] && persons[personIndex].name.trim() !== '') {
+                        people.push(persons[personIndex].name);
+                    }
+                }
+            }
+            
+            const hasOnlyVacio = people.length > 0 && 
+                                people.every(person => 
+                                    person.toLowerCase().includes('vacio') || 
+                                    person.trim() === 'Vacio'
+                                );
+            
+            group.days.push({
+                day: dateString,
+                people: people,
+                date: new Date(currentDate),
+                originalDate: new Date(currentDate),
+                isEmpty: people.length === 0,
+                hidden: hasOnlyVacio
+            });
+            
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+    });
+}
+
+
+
 
         // Obtener el siguiente cuadro
         function getNextDay(groupIdx, dayIdx) {
@@ -1247,6 +1327,291 @@ function processUsersFromExcel(workbook) {
             personElement.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
         }
+
+// Soporte para dispositivos táctiles
+function initializeTouchEvents() {
+    let touchStartElement = null;
+    let touchStartTime = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+        if (!isLoggedIn) return;
+        
+        touchStartElement = e.target;
+        touchStartTime = Date.now();
+        
+        // Para elementos de persona
+        if (touchStartElement.classList.contains('person-item')) {
+            touchStartElement.style.backgroundColor = '#cce7ff';
+            e.preventDefault();
+        }
+        
+        // Para días completos
+        if (touchStartElement.classList.contains('calendar-day') && !touchStartElement.classList.contains('empty')) {
+            touchStartElement.style.boxShadow = '0 0 0 3px #00b4db';
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    document.addEventListener('touchend', function(e) {
+        if (!isLoggedIn || !touchStartElement) return;
+        
+        const touchDuration = Date.now() - touchStartTime;
+        const isLongPress = touchDuration > 500; // Presión larga > 500ms
+        
+        // Restaurar estilos
+        if (touchStartElement.classList.contains('person-item')) {
+            touchStartElement.style.backgroundColor = '';
+        }
+        if (touchStartElement.classList.contains('calendar-day')) {
+            touchStartElement.style.boxShadow = '';
+        }
+        
+        if (isLongPress) {
+            // Para elementos de persona - mostrar opciones
+            if (touchStartElement.classList.contains('person-item')) {
+                showPersonOptions(touchStartElement, e.changedTouches[0]);
+            }
+            // Para días completos - mostrar opciones de día
+            else if (touchStartElement.classList.contains('calendar-day')) {
+                showDayOptions(touchStartElement, e.changedTouches[0]);
+            }
+        }
+        
+        touchStartElement = null;
+    });
+    
+    // Prevenir scroll no deseado
+    document.addEventListener('touchmove', function(e) {
+        if (touchStartElement && (touchStartElement.classList.contains('person-item') || 
+            touchStartElement.classList.contains('calendar-day'))) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+}
+
+// Mostrar opciones para persona (móvil)
+function showPersonOptions(personElement, touch) {
+    const groupIdx = parseInt(personElement.closest('.calendar-day').dataset.group);
+    const dayIdx = parseInt(personElement.closest('.calendar-day').dataset.day);
+    const personIndex = Array.from(personElement.parentNode.children).indexOf(personElement);
+    
+    const personName = personElement.textContent;
+    
+    // Crear menú contextual
+    const menu = document.createElement('div');
+    menu.style.cssText = `
+        position: fixed;
+        left: ${touch.clientX}px;
+        top: ${touch.clientY}px;
+        background: white;
+        border: 2px solid #00b4db;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        min-width: 150px;
+    `;
+    
+    menu.innerHTML = `
+        <div style="margin-bottom: 8px; font-weight: bold; color: #333;">${personName}</div>
+        <button class="mobile-menu-btn" data-action="move">Mover persona</button>
+        <button class="mobile-menu-btn" data-action="remove">Quitar persona</button>
+        <button class="mobile-menu-btn" data-action="cancel" style="margin-top: 5px; background: #6c757d;">Cancelar</button>
+    `;
+    
+    document.body.appendChild(menu);
+    
+    // Event listeners para los botones
+    menu.querySelectorAll('.mobile-menu-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const action = this.dataset.action;
+            
+            switch(action) {
+                case 'move':
+                    startPersonMove(groupIdx, dayIdx, personIndex, personName);
+                    break;
+                case 'remove':
+                    removePersonFromDay(groupIdx, dayIdx, personIndex);
+                    break;
+            }
+            
+            document.body.removeChild(menu);
+        });
+    });
+    
+    // Cerrar menú al tocar fuera
+    setTimeout(() => {
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                document.body.removeChild(menu);
+                document.removeEventListener('touchstart', closeMenu);
+            }
+        };
+        document.addEventListener('touchstart', closeMenu);
+    }, 100);
+}
+
+// Mostrar opciones para día (móvil)
+function showDayOptions(dayElement, touch) {
+    const groupIdx = parseInt(dayElement.dataset.group);
+    const dayIdx = parseInt(dayElement.dataset.day);
+    
+    const menu = document.createElement('div');
+    menu.style.cssText = `
+        position: fixed;
+        left: ${touch.clientX}px;
+        top: ${touch.clientY}px;
+        background: white;
+        border: 2px solid #00b4db;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        min-width: 150px;
+    `;
+    
+    menu.innerHTML = `
+        <div style="margin-bottom: 8px; font-weight: bold; color: #333;">Opciones del día</div>
+        <button class="mobile-menu-btn" data-action="add">Agregar persona</button>
+        <button class="mobile-menu-btn" data-action="removeLast">Quitar última persona</button>
+        <button class="mobile-menu-btn" data-action="toggle">${scheduleData.groups[groupIdx].days[dayIdx].hidden ? 'Mostrar' : 'Ocultar'} día</button>
+        <button class="mobile-menu-btn" data-action="moveDay">Mover día completo</button>
+        <button class="mobile-menu-btn" data-action="cancel" style="margin-top: 5px; background: #6c757d;">Cancelar</button>
+    `;
+    
+    document.body.appendChild(menu);
+    
+    menu.querySelectorAll('.mobile-menu-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const action = this.dataset.action;
+            
+            switch(action) {
+                case 'add':
+                    addPerson(groupIdx, dayIdx);
+                    break;
+                case 'removeLast':
+                    removePerson(groupIdx, dayIdx);
+                    break;
+                case 'toggle':
+                    toggleDayVisibility(groupIdx, dayIdx);
+                    break;
+                case 'moveDay':
+                    startDayMove(groupIdx, dayIdx);
+                    break;
+            }
+            
+            document.body.removeChild(menu);
+        });
+    });
+    
+    setTimeout(() => {
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                document.body.removeChild(menu);
+                document.removeEventListener('touchstart', closeMenu);
+            }
+        };
+        document.addEventListener('touchstart', closeMenu);
+    }, 100);
+}
+
+// Iniciar movimiento de persona (móvil)
+function startPersonMove(sourceGroupIdx, sourceDayIdx, personIndex, personName) {
+    const sourceDay = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
+    const movedPerson = sourceDay.people[personIndex];
+    
+    showStatus(`Seleccione el día destino para: ${personName}`);
+    
+    // Resaltar días disponibles
+    document.querySelectorAll('.calendar-day').forEach(day => {
+        const groupIdx = parseInt(day.dataset.group);
+        const dayIdx = parseInt(day.dataset.day);
+        const targetDay = scheduleData.groups[groupIdx].days[dayIdx];
+        
+        if (!targetDay.hidden && targetDay.people.length < 4) {
+            day.style.boxShadow = '0 0 0 3px #28a745';
+            day.style.cursor = 'pointer';
+            
+            day.addEventListener('click', function moveHandler() {
+                // Mover la persona
+                sourceDay.people.splice(personIndex, 1);
+                targetDay.people.push(movedPerson);
+                
+                sourceDay.isEmpty = sourceDay.people.length === 0;
+                targetDay.isEmpty = false;
+                
+                // Limpiar estilos y eventos
+                document.querySelectorAll('.calendar-day').forEach(d => {
+                    d.style.boxShadow = '';
+                    d.style.cursor = '';
+                    d.removeEventListener('click', moveHandler);
+                });
+                
+                initSchedule();
+                showStatus(`Persona "${movedPerson}" movida correctamente`);
+            });
+        }
+    });
+}
+
+// Iniciar movimiento de día completo (móvil)
+function startDayMove(sourceGroupIdx, sourceDayIdx) {
+    showStatus('Seleccione el día destino para intercambiar');
+    
+    document.querySelectorAll('.calendar-day').forEach(day => {
+        const targetGroupIdx = parseInt(day.dataset.group);
+        const targetDayIdx = parseInt(day.dataset.day);
+        
+        if (!(sourceGroupIdx === targetGroupIdx && sourceDayIdx === targetDayIdx)) {
+            day.style.boxShadow = '0 0 0 3px #ffc107';
+            day.style.cursor = 'pointer';
+            
+            day.addEventListener('click', function dayMoveHandler() {
+                const sourceData = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
+                const targetData = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+                
+                const sourceOriginalDate = new Date(sourceData.originalDate);
+                const targetOriginalDate = new Date(targetData.originalDate);
+                
+                const tempPeople = [...sourceData.people];
+                const tempIsEmpty = sourceData.isEmpty;
+                const tempHidden = sourceData.hidden;
+                
+                sourceData.people = [...targetData.people];
+                sourceData.isEmpty = targetData.isEmpty;
+                sourceData.hidden = targetData.hidden;
+                
+                targetData.people = tempPeople;
+                targetData.isEmpty = tempIsEmpty;
+                targetData.hidden = tempHidden;
+                
+                updateDayHeader(sourceData, sourceOriginalDate);
+                updateDayHeader(targetData, targetOriginalDate);
+                
+                // Limpiar estilos y eventos
+                document.querySelectorAll('.calendar-day').forEach(d => {
+                    d.style.boxShadow = '';
+                    d.style.cursor = '';
+                    d.removeEventListener('click', dayMoveHandler);
+                });
+                
+                initSchedule();
+                showStatus('Día movido correctamente');
+            });
+        }
+    });
+}
+
+// Quitar persona específica de un día
+function removePersonFromDay(groupIdx, dayIdx, personIndex) {
+    const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+    const removedPerson = dayData.people.splice(personIndex, 1)[0];
+    
+    dayData.isEmpty = dayData.people.length === 0;
+    
+    initSchedule();
+    showStatus(`Persona "${removedPerson}" quitada correctamente`);
+}
 
         function handlePersonDragEnd(e) {
             document.querySelectorAll('.person-item').forEach(item => {
@@ -1942,6 +2307,7 @@ function processUsersFromExcel(workbook) {
 
         // Inicializar
         loadExcelAutomatically();
+initializeTouchEvents();
     </script>
 </body>
 </html>
