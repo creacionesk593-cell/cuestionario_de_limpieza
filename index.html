@@ -210,14 +210,6 @@
             border: 2px dashed #00b4db;
         }
 
-        .person-item.drop-above {
-            border-top: 3px solid #00b4db;
-        }
-
-        .person-item.drop-below {
-            border-bottom: 3px solid #00b4db;
-        }
-
         .person-item.position-indicator {
             background: #e3f2fd;
             border: 2px dashed #00b4db;
@@ -306,26 +298,6 @@
             font-weight: bold;
             color: #333;
             font-size: 16px;
-        }
-
-        .notes-section {
-            background: #fff3cd;
-            padding: 15px 20px;
-            margin: 15px 25px;
-            border-radius: 8px;
-            border-left: 4px solid #ffc107;
-        }
-
-        .notes-section h3 {
-            margin-bottom: 8px;
-            color: #856404;
-            font-size: 17px;
-        }
-
-        .notes-section p {
-            margin: 4px 0;
-            color: #856404;
-            font-size: 15px;
         }
 
         .file-input-container {
@@ -701,21 +673,6 @@
             transform: translate(-50%, -50%);
         }
 
-        .day-drag-ghost {
-            position: fixed;
-            background: #fffbf0;
-            border: 3px dashed #ffc107;
-            border-radius: 10px;
-            padding: 15px;
-            z-index: 9999;
-            pointer-events: none;
-            opacity: 0.9;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            min-width: 150px;
-            text-align: center;
-        }
-
         .position-indicator-modal {
             display: none;
             position: fixed;
@@ -943,7 +900,7 @@
             <h3>Seleccione la posición</h3>
             <div class="position-options">
                 <div class="position-option" data-position="0">⬆️ Arriba del todo</div>
-                <div class="position-option" data-position="1">↕️ Entre nombres</div>
+                <div class="position-option" data-position="1">↕️ En el medio</div>
                 <div class="position-option" data-position="2">⬇️ Abajo del todo</div>
             </div>
             <button class="btn btn-primary" id="confirmPositionBtn">Confirmar</button>
@@ -1489,7 +1446,38 @@
                 personName: personElement.textContent
             };
             
-            // Mostrar modal de selección de posición
+            showStatus('Seleccione el día destino');
+            
+            // Resaltar días destino posibles
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                const targetGroupIdx = parseInt(day.dataset.group);
+                const targetDayIdx = parseInt(day.dataset.day);
+                const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+                
+                if (!(groupIdx === targetGroupIdx && dayIdx === targetDayIdx) &&
+                    !day.classList.contains('hidden') && !day.classList.contains('empty') &&
+                    targetDay.people.length < 4) {
+                    day.classList.add('drop-target');
+                    day.addEventListener('click', handlePositionTargetSelection);
+                }
+            });
+        }
+
+        function handlePositionTargetSelection(e) {
+            if (!personForPositionMove) return;
+            
+            const targetElement = e.currentTarget;
+            const targetGroupIdx = parseInt(targetElement.dataset.group);
+            const targetDayIdx = parseInt(targetElement.dataset.day);
+            
+            targetDayForPosition = { groupIdx: targetGroupIdx, dayIdx: targetDayIdx };
+            
+            // Limpiar estilos y eventos
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                day.classList.remove('drop-target');
+                day.removeEventListener('click', handlePositionTargetSelection);
+            });
+            
             showPositionModal();
         }
 
@@ -1545,6 +1533,7 @@
             showStatus(`Persona "${movedPerson}" movida a posición ${getPositionName(position)}`);
             
             personForPositionMove = null;
+            targetDayForPosition = null;
         }
 
         function getPositionName(position) {
@@ -1558,7 +1547,6 @@
 
         // SISTEMA TÁCTIL MEJORADO PARA PERSONAS
         function initializeTouchSystem() {
-            // Eventos para personas
             document.addEventListener('touchstart', handleTouchStart, { passive: false });
             document.addEventListener('touchmove', handleTouchMove, { passive: false });
             document.addEventListener('touchend', handleTouchEnd);
@@ -1589,7 +1577,6 @@
             const deltaX = Math.abs(touch.clientX - startTouch.x);
             const deltaY = Math.abs(touch.clientY - startTouch.y);
             
-            // Iniciar arrastre después de un movimiento mínimo
             if ((deltaX > 10 || deltaY > 10) && !touchDragging) {
                 startDrag(startTouch.target, touch);
                 touchDragging = true;
@@ -1607,9 +1594,8 @@
                 const touch = e.changedTouches[0];
                 completeDrag(touch);
             } else if (startTouch) {
-                // Fue un tap, mostrar opciones de posición
                 const duration = Date.now() - startTouch.time;
-                if (duration < 500) { // Tap corto
+                if (duration < 500) {
                     showPersonOptions(startTouch.target, e.changedTouches[0]);
                 }
             }
@@ -1637,14 +1623,13 @@
             
             document.body.appendChild(menu);
             
-            // Event listeners
             menu.querySelectorAll('.mobile-menu-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const action = this.dataset.action;
                     
                     switch(action) {
                         case 'moveWithPosition':
-                            startPositionMoveWithTarget(personElement);
+                            startPositionMove(personElement);
                             break;
                         case 'removePerson':
                             removeSpecificPerson(groupIdx, dayIdx, personIndex);
@@ -1655,7 +1640,6 @@
                 });
             });
             
-            // Cerrar menú al tocar fuera
             setTimeout(() => {
                 const closeMenu = (e) => {
                     if (!menu.contains(e.target)) {
@@ -1667,58 +1651,6 @@
             }, 100);
         }
 
-        function startPositionMoveWithTarget(personElement) {
-            const groupIdx = parseInt(personElement.closest('.calendar-day').dataset.group);
-            const dayIdx = parseInt(personElement.closest('.calendar-day').dataset.day);
-            const personIndex = Array.from(personElement.parentNode.children).indexOf(personElement);
-            
-            personForPositionMove = {
-                sourceGroup: groupIdx,
-                sourceDay: dayIdx,
-                personIndex: personIndex,
-                personName: personElement.textContent
-            };
-            
-            positionMoveMode = true;
-            showStatus('Seleccione el día destino para mover con posición');
-            
-            // Resaltar días destino posibles
-            document.querySelectorAll('.calendar-day').forEach(day => {
-                const targetGroupIdx = parseInt(day.dataset.group);
-                const targetDayIdx = parseInt(day.dataset.day);
-                const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
-                
-                if (!(groupIdx === targetGroupIdx && dayIdx === targetDayIdx) &&
-                    !day.classList.contains('hidden') && !day.classList.contains('empty') &&
-                    targetDay.people.length < 4) {
-                    day.classList.add('drop-target');
-                    day.addEventListener('click', handlePositionTargetSelection);
-                }
-            });
-        }
-
-        function handlePositionTargetSelection(e) {
-            if (!positionMoveMode || !personForPositionMove) return;
-            
-            const targetElement = e.currentTarget;
-            const targetGroupIdx = parseInt(targetElement.dataset.group);
-            const targetDayIdx = parseInt(targetElement.dataset.day);
-            
-            targetDayForPosition = { groupIdx: targetGroupIdx, dayIdx: targetDayIdx };
-            showPositionModal();
-            
-            // Limpiar estilos y eventos
-            cleanupPositionMoveMode();
-        }
-
-        function cleanupPositionMoveMode() {
-            document.querySelectorAll('.calendar-day').forEach(day => {
-                day.classList.remove('drop-target');
-                day.removeEventListener('click', handlePositionTargetSelection);
-            });
-            positionMoveMode = false;
-        }
-
         function removeSpecificPerson(groupIdx, dayIdx, personIndex) {
             const dayData = scheduleData.groups[groupIdx].days[dayIdx];
             const removedPerson = dayData.people.splice(personIndex, 1)[0];
@@ -1728,7 +1660,307 @@
             showStatus(`Persona "${removedPerson}" eliminada`);
         }
 
-        // ... (el resto del código de las funciones de drag & drop se mantiene igual)
+        // Funciones de drag & drop básicas
+        function startDrag(personElement, touch) {
+            draggedPersonElement = personElement;
+            const groupIdx = parseInt(personElement.closest('.calendar-day').dataset.group);
+            const dayIdx = parseInt(personElement.closest('.calendar-day').dataset.day);
+            const personIndex = Array.from(personElement.parentNode.children).indexOf(personElement);
+            
+            draggedPerson = {
+                sourceGroup: groupIdx,
+                sourceDay: dayIdx,
+                personIndex: personIndex,
+                personName: personElement.textContent
+            };
+            
+            dragGhost = document.createElement('div');
+            dragGhost.className = 'drag-ghost';
+            dragGhost.textContent = personElement.textContent;
+            dragGhost.style.left = touch.clientX + 'px';
+            dragGhost.style.top = touch.clientY + 'px';
+            document.body.appendChild(dragGhost);
+            
+            personElement.classList.add('touch-dragging');
+            
+            showStatus(`Arrastrando: ${personElement.textContent}. Suelte en el día destino`);
+        }
+
+        function updateDragPosition(touch) {
+            if (dragGhost) {
+                dragGhost.style.left = touch.clientX + 'px';
+                dragGhost.style.top = touch.clientY + 'px';
+            }
+        }
+
+        function updateDropTargets(touch) {
+            document.querySelectorAll('.calendar-day.drop-target').forEach(day => {
+                day.classList.remove('drop-target');
+            });
+            
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            const dayElement = element ? element.closest('.calendar-day') : null;
+            
+            if (dayElement && !dayElement.classList.contains('hidden') && !dayElement.classList.contains('empty')) {
+                const targetGroupIdx = parseInt(dayElement.dataset.group);
+                const targetDayIdx = parseInt(dayElement.dataset.day);
+                const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+                
+                if (!(draggedPerson.sourceGroup === targetGroupIdx && draggedPerson.sourceDay === targetDayIdx) &&
+                    targetDay.people.length < 4) {
+                    dayElement.classList.add('drop-target');
+                }
+            }
+        }
+
+        function completeDrag(touch) {
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            const dayElement = element ? element.closest('.calendar-day') : null;
+            
+            if (dayElement && dayElement.classList.contains('drop-target')) {
+                const targetGroupIdx = parseInt(dayElement.dataset.group);
+                const targetDayIdx = parseInt(dayElement.dataset.day);
+                
+                movePersonToDay(
+                    draggedPerson.sourceGroup, 
+                    draggedPerson.sourceDay, 
+                    draggedPerson.personIndex,
+                    targetGroupIdx, 
+                    targetDayIdx
+                );
+            }
+            
+            if (dragGhost) {
+                document.body.removeChild(dragGhost);
+                dragGhost = null;
+            }
+        }
+
+        function movePersonToDay(sourceGroupIdx, sourceDayIdx, personIndex, targetGroupIdx, targetDayIdx) {
+            const sourceDay = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
+            const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            if (targetDay.people.length >= 4) {
+                showStatus('No se puede mover: día destino ya tiene 4 personas', 'error');
+                return;
+            }
+            
+            const movedPerson = sourceDay.people.splice(personIndex, 1)[0];
+            targetDay.people.push(movedPerson);
+            
+            sourceDay.isEmpty = sourceDay.people.length === 0;
+            targetDay.isEmpty = false;
+            
+            initSchedule();
+            showStatus(`Persona "${movedPerson}" movida correctamente`);
+        }
+
+        function resetDrag() {
+            if (draggedPersonElement) {
+                draggedPersonElement.classList.remove('touch-dragging');
+                draggedPersonElement = null;
+            }
+            
+            document.querySelectorAll('.calendar-day.drop-target').forEach(day => {
+                day.classList.remove('drop-target');
+            });
+            
+            if (dragGhost) {
+                document.body.removeChild(dragGhost);
+                dragGhost = null;
+            }
+            
+            touchDragging = false;
+            startTouch = null;
+            draggedPerson = null;
+        }
+
+        // SISTEMA DE MOVIMIENTO DE DÍAS COMPLETOS
+        function initializeDayTouchSystem() {
+            document.addEventListener('touchstart', function(e) {
+                if (!isLoggedIn || touchDragging) return;
+                
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                const dayElement = target ? target.closest('.calendar-day') : null;
+                
+                if (dayElement && !dayElement.classList.contains('hidden') && !dayElement.classList.contains('empty')) {
+                    const groupIdx = parseInt(dayElement.dataset.group);
+                    const dayIdx = parseInt(dayElement.dataset.day);
+                    
+                    startTouch = {
+                        element: dayElement,
+                        x: touch.clientX,
+                        y: touch.clientY,
+                        time: Date.now(),
+                        groupIdx: groupIdx,
+                        dayIdx: dayIdx
+                    };
+                }
+            }, { passive: true });
+            
+            document.addEventListener('touchend', function(e) {
+                if (!startTouch || touchDragging) return;
+                
+                const touch = e.changedTouches[0];
+                const duration = Date.now() - startTouch.time;
+                const distance = Math.sqrt(
+                    Math.pow(touch.clientX - startTouch.x, 2) + 
+                    Math.pow(touch.clientY - startTouch.y, 2)
+                );
+                
+                if (duration > 800 && distance < 20) {
+                    showDayOptions(startTouch.element, touch);
+                }
+                
+                startTouch = null;
+            }, { passive: true });
+        }
+
+        function showDayOptions(dayElement, touch) {
+            const groupIdx = parseInt(dayElement.dataset.group);
+            const dayIdx = parseInt(dayElement.dataset.day);
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            
+            const menu = document.createElement('div');
+            menu.className = 'mobile-menu';
+            menu.style.left = Math.min(touch.clientX, window.innerWidth - 200) + 'px';
+            menu.style.top = Math.min(touch.clientY, window.innerHeight - 250) + 'px';
+            
+            menu.innerHTML = `
+                <div style="margin-bottom: 8px; font-weight: bold; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                    ${dayData.day.split(' ')[0]}
+                </div>
+                <button class="mobile-menu-btn" data-action="add">➕ Agregar persona</button>
+                <button class="mobile-menu-btn" data-action="remove">➖ Quitar persona</button>
+                <button class="mobile-menu-btn" data-action="toggle">${dayData.hidden ? '👁️ Mostrar' : '👁️ Ocultar'} día</button>
+                <button class="mobile-menu-btn" data-action="moveDay">🔄 Mover día completo</button>
+                <button class="mobile-menu-btn cancel" data-action="cancel">❌ Cancelar</button>
+            `;
+            
+            document.body.appendChild(menu);
+            
+            menu.querySelectorAll('.mobile-menu-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const action = this.dataset.action;
+                    
+                    switch(action) {
+                        case 'add':
+                            addPerson(groupIdx, dayIdx);
+                            break;
+                        case 'remove':
+                            removePerson(groupIdx, dayIdx);
+                            break;
+                        case 'toggle':
+                            toggleDayVisibility(groupIdx, dayIdx);
+                            break;
+                        case 'moveDay':
+                            startDayMove(groupIdx, dayIdx);
+                            break;
+                    }
+                    
+                    document.body.removeChild(menu);
+                });
+            });
+            
+            setTimeout(() => {
+                const closeMenu = (e) => {
+                    if (!menu.contains(e.target)) {
+                        document.body.removeChild(menu);
+                        document.removeEventListener('touchstart', closeMenu);
+                    }
+                };
+                document.addEventListener('touchstart', closeMenu);
+            }, 100);
+        }
+
+        function startDayMove(sourceGroupIdx, sourceDayIdx) {
+            dayMoveMode = true;
+            sourceDayForMove = { groupIdx: sourceGroupIdx, dayIdx: sourceDayIdx };
+            
+            const sourceElement = document.querySelector(`.calendar-day[data-group="${sourceGroupIdx}"][data-day="${sourceDayIdx}"]`);
+            if (sourceElement) {
+                sourceElement.classList.add('day-move-source');
+            }
+            
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                const targetGroupIdx = parseInt(day.dataset.group);
+                const targetDayIdx = parseInt(day.dataset.day);
+                
+                if (!(sourceGroupIdx === targetGroupIdx && sourceDayIdx === targetDayIdx) &&
+                    !day.classList.contains('hidden') && !day.classList.contains('empty')) {
+                    day.classList.add('day-move-target');
+                    day.addEventListener('click', handleDayMoveSelection);
+                }
+            });
+            
+            showStatus('Seleccione el día destino para intercambiar');
+        }
+
+        function handleDayMoveSelection(e) {
+            if (!dayMoveMode || !sourceDayForMove) return;
+            
+            const targetElement = e.currentTarget;
+            const targetGroupIdx = parseInt(targetElement.dataset.group);
+            const targetDayIdx = parseInt(targetElement.dataset.day);
+            
+            swapDays(
+                sourceDayForMove.groupIdx, 
+                sourceDayForMove.dayIdx, 
+                targetGroupIdx, 
+                targetDayIdx
+            );
+            
+            cleanupDayMoveMode();
+        }
+
+        function swapDays(sourceGroupIdx, sourceDayIdx, targetGroupIdx, targetDayIdx) {
+            const sourceData = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
+            const targetData = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            const sourceOriginalDate = new Date(sourceData.originalDate);
+            const targetOriginalDate = new Date(targetData.originalDate);
+            
+            const tempPeople = [...sourceData.people];
+            const tempIsEmpty = sourceData.isEmpty;
+            const tempHidden = sourceData.hidden;
+            
+            sourceData.people = [...targetData.people];
+            sourceData.isEmpty = targetData.isEmpty;
+            sourceData.hidden = targetData.hidden;
+            
+            targetData.people = tempPeople;
+            targetData.isEmpty = tempIsEmpty;
+            targetData.hidden = tempHidden;
+            
+            updateDayHeader(sourceData, sourceOriginalDate);
+            updateDayHeader(targetData, targetOriginalDate);
+            
+            initSchedule();
+            showStatus('Días intercambiados correctamente');
+        }
+
+        function cleanupDayMoveMode() {
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                day.classList.remove('day-move-source', 'day-move-target');
+                day.removeEventListener('click', handleDayMoveSelection);
+            });
+            
+            dayMoveMode = false;
+            sourceDayForMove = null;
+        }
+
+        function updateDayHeader(dayData, date) {
+            const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            const dayName = dayNames[date.getDay()];
+            const dayNumber = date.getDate();
+            const month = date.getMonth() + 1;
+            const year = date.getFullYear();
+            
+            dayData.day = `${dayName} ${dayNumber}/${month}/${year}`;
+            dayData.date = new Date(date);
+            dayData.originalDate = new Date(date);
+        }
 
         // Inicializar el cronograma con botones de posición
         function initSchedule() {
@@ -1771,7 +2003,7 @@
                     const content = document.createElement('div');
                     content.className = 'day-content';
                     
-                    // Controles de posición (solo si está logueado y no está vacío/oculto)
+                    // Controles de posición (botones ⬆️⬇️)
                     if (isLoggedIn && !dayData.hidden && !dayData.isEmpty) {
                         const positionControls = document.createElement('div');
                         positionControls.className = 'position-controls';
@@ -1908,13 +2140,6 @@
             personDiv.dataset.index = index;
             
             if (isLoggedIn) {
-                personDiv.addEventListener('click', function(e) {
-                    if (e.ctrlKey || e.metaKey) {
-                        // Ctrl+click para mover con posición
-                        startPositionMove(this);
-                    }
-                });
-                
                 // Doble click para mover con posición
                 let clickTimer = null;
                 personDiv.addEventListener('click', function(e) {
@@ -2000,7 +2225,329 @@
             });
         });
 
-        // ... (el resto del código se mantiene igual)
+        // Sistema de login
+        document.getElementById('loginSubmit').addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showStatus('Ingrese usuario y contraseña', 'error');
+                return;
+            }
+
+            if (Object.keys(VALID_USERS).length === 0) {
+                showStatus('No hay usuarios configurados en el sistema', 'error');
+                return;
+            }
+
+            if (VALID_USERS[username] && VALID_USERS[username] === password) {
+                isLoggedIn = true;
+                currentUser = username;
+                document.getElementById('loginModal').classList.remove('active');
+                document.getElementById('userInfo').innerHTML = `
+                    <span>👤 ${username}</span>
+                    <button class="btn btn-danger" id="logoutBtn">Cerrar Sesión</button>
+                `;
+                
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    isLoggedIn = false;
+                    currentUser = null;
+                    document.getElementById('userInfo').innerHTML = `
+                        <button class="btn btn-primary" id="loginBtn">🔐 Iniciar Sesión</button>
+                    `;
+                    document.getElementById('loginBtn').addEventListener('click', () => {
+                        document.getElementById('loginModal').classList.add('active');
+                    });
+                    initSchedule();
+                    showStatus('Sesión cerrada correctamente');
+                });
+
+                autoHideVacioDays();
+                initSchedule();
+                showStatus(`Bienvenido/a ${username}`);
+            } else {
+                showStatus('Usuario o contraseña incorrectos', 'error');
+            }
+        });
+
+        // Actualizar Excel
+        document.getElementById('updateExcelBtn').addEventListener('click', function() {
+            if (!currentExcelData) {
+                showStatus('No hay archivo Excel cargado para actualizar', 'error');
+                return;
+            }
+
+            try {
+                const scheduleSheetName = currentExcelData.SheetNames.find(name => 
+                    name.toLowerCase().includes('cronograma') || 
+                    name.toLowerCase().includes('limpieza')
+                ) || currentExcelData.SheetNames[0];
+
+                const newData = originalExcelStructure ? [...originalExcelStructure[scheduleSheetName]] : [];
+                
+                if (newData.length === 0) {
+                    newData.push(['Nombre', 'Supervisora', 'Fecha Asignada', 'Estado']);
+                }
+                
+                let nameCol = -1, supervisorCol = -1, dateCol = -1, statusCol = -1;
+                if (newData.length > 0) {
+                    const headerRow = newData[0];
+                    for (let i = 0; i < headerRow.length; i++) {
+                        const cell = headerRow[i] ? headerRow[i].toString().toLowerCase() : '';
+                        if (cell.includes('nombre')) nameCol = i;
+                        if (cell.includes('supervisora')) supervisorCol = i;
+                        if (cell.includes('fecha') || cell.includes('día')) dateCol = i;
+                        if (cell.includes('estado')) statusCol = i;
+                    }
+                    
+                    if (statusCol === -1) {
+                        statusCol = headerRow.length;
+                        newData[0].push('Estado');
+                    }
+                }
+                
+                const headerRow = newData[0];
+                newData.splice(1, newData.length - 1);
+                
+                scheduleData.groups.forEach((group, groupIndex) => {
+                    group.days.forEach(day => {
+                        const shouldBeHidden = hasOnlyVacioNames(day);
+                        if (shouldBeHidden && !day.hidden && isLoggedIn) {
+                            day.hidden = true;
+                        }
+                        
+                        if (day.people.length === 0) {
+                            const newRow = new Array(headerRow.length).fill('');
+                            
+                            if (nameCol !== -1) newRow[nameCol] = 'Vacio';
+                            if (dateCol !== -1) newRow[dateCol] = day.day;
+                            if (statusCol !== -1) {
+                                newRow[statusCol] = day.hidden ? 'Oculto (Vacio)' : 'Activo';
+                            }
+                            
+                            newData.push(newRow);
+                        } else {
+                            day.people.forEach(person => {
+                                if (person && person.trim() !== '') {
+                                    const newRow = new Array(headerRow.length).fill('');
+                                    
+                                    if (nameCol !== -1) newRow[nameCol] = person;
+                                    if (dateCol !== -1) newRow[dateCol] = day.day;
+                                    if (supervisorCol !== -1) {
+                                        const personData = persons.find(p => p.name === person);
+                                        if (personData && personData.supervisor) {
+                                            newRow[supervisorCol] = personData.supervisor;
+                                        } else {
+                                            newRow[supervisorCol] = '';
+                                        }
+                                    }
+                                    if (statusCol !== -1) {
+                                        const status = day.hidden ? 
+                                            (hasOnlyVacioNames(day) ? 'Oculto (Vacio)' : 'Oculto') : 
+                                            'Activo';
+                                        newRow[statusCol] = status;
+                                    }
+                                    
+                                    newData.push(newRow);
+                                }
+                            });
+                        }
+                    });
+                });
+
+                const newWorksheet = XLSX.utils.aoa_to_sheet(newData);
+                currentExcelData.Sheets[scheduleSheetName] = newWorksheet;
+
+                const outputFilename = currentExcelFile || 'Limpieza_igle_actualizado.xlsx';
+                XLSX.writeFile(currentExcelData, outputFilename);
+                showStatus(`Excel actualizado correctamente: ${outputFilename}`);
+                
+            } catch (error) {
+                console.error('Error actualizando Excel:', error);
+                showStatus('Error al actualizar el Excel: ' + error.message, 'error');
+            }
+        });
+
+        function updateDateInput() {
+            const dateInput = document.getElementById('startDate');
+            if (scheduleData.startDate) {
+                dateInput.valueAsDate = scheduleData.startDate;
+            }
+        }
+
+        function updateMonthYear() {
+            if (!scheduleData.startDate) return;
+            
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            
+            const startMonth = monthNames[scheduleData.startDate.getMonth()];
+            const startYear = scheduleData.startDate.getFullYear();
+            
+            const endDate = new Date(scheduleData.startDate);
+            endDate.setDate(endDate.getDate() + 27);
+            const endMonth = monthNames[endDate.getMonth()];
+            const endYear = endDate.getFullYear();
+            
+            document.getElementById('currentMonthYear').textContent = 
+                `${startMonth} ${startYear} - ${endMonth} ${endYear}`;
+        }
+
+        // Event listeners restantes
+        document.getElementById('fontIncreaseBtn').addEventListener('click', () => {
+            const sizes = ['xs', 'sm', 'md', 'lg', 'xl'];
+            const currentIndex = sizes.indexOf(currentFontSize);
+            if (currentIndex < sizes.length - 1) {
+                currentFontSize = sizes[currentIndex + 1];
+                applyFontStyles();
+                showStatus(`Tamaño de fuente: ${currentFontSize.toUpperCase()}`);
+            }
+        });
+
+        document.getElementById('fontDecreaseBtn').addEventListener('click', () => {
+            const sizes = ['xs', 'sm', 'md', 'lg', 'xl'];
+            const currentIndex = sizes.indexOf(currentFontSize);
+            if (currentIndex > 0) {
+                currentFontSize = sizes[currentIndex - 1];
+                applyFontStyles();
+                showStatus(`Tamaño de fuente: ${currentFontSize.toUpperCase()}`);
+            }
+        });
+
+        document.getElementById('fontFamilySelect').addEventListener('change', (e) => {
+            currentFontFamily = e.target.value;
+            applyFontStyles();
+            showStatus(`Fuente cambiada a: ${currentFontFamily}`);
+        });
+
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            document.getElementById('loginModal').classList.add('active');
+        });
+
+        document.getElementById('loginCancel').addEventListener('click', () => {
+            document.getElementById('loginModal').classList.remove('active');
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            document.getElementById('orientationModal').classList.add('active');
+            
+            document.querySelectorAll('.orientation-option').forEach(option => {
+                option.classList.remove('selected');
+                if (option.dataset.orientation === selectedOrientation) {
+                    option.classList.add('selected');
+                }
+            });
+        });
+
+        document.querySelectorAll('.orientation-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.orientation-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                this.classList.add('selected');
+                selectedOrientation = this.dataset.orientation;
+            });
+        });
+
+        document.getElementById('confirmDownloadBtn').addEventListener('click', () => {
+            document.getElementById('orientationModal').classList.remove('active');
+            downloadImage(selectedOrientation);
+        });
+
+        document.getElementById('cancelDownloadBtn').addEventListener('click', () => {
+            document.getElementById('orientationModal').classList.remove('active');
+        });
+
+        function downloadImage(orientation) {
+            document.querySelector('.container').classList.add('download-mode');
+            
+            const config = {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                logging: false
+            };
+            
+            if (orientation === 'vertical') {
+                config.width = document.querySelector('.container').scrollWidth;
+                config.height = document.querySelector('.container').scrollHeight;
+                config.windowWidth = document.querySelector('.container').scrollWidth;
+                config.windowHeight = document.querySelector('.container').scrollHeight;
+            }
+            
+            html2canvas(document.querySelector('.container'), config).then(canvas => {
+                document.querySelector('.container').classList.remove('download-mode');
+                
+                const link = document.createElement('a');
+                link.download = `cronograma-limpieza-${orientation}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showStatus(`Imagen ${orientation} descargada correctamente`);
+            }).catch(error => {
+                document.querySelector('.container').classList.remove('download-mode');
+                console.error('Error al descargar imagen:', error);
+                showStatus('Error al descargar la imagen', 'error');
+            });
+        }
+
+        document.getElementById('applyDateBtn').addEventListener('click', function() {
+            const dateInput = document.getElementById('startDate');
+            const selectedDate = new Date(dateInput.value);
+            
+            if (selectedDate.getDay() !== 1) {
+                showStatus('Por favor seleccione un lunes como fecha de inicio', 'error');
+                return;
+            }
+            
+            const currentNames = [];
+            const currentHiddenStates = [];
+            scheduleData.groups.forEach(group => {
+                group.days.forEach(day => {
+                    currentNames.push([...day.people]);
+                    currentHiddenStates.push(day.hidden);
+                });
+            });
+            
+            scheduleData.startDate = selectedDate;
+            initialize6x4Structure();
+            
+            let nameIndex = 0;
+            let hiddenIndex = 0;
+            scheduleData.groups.forEach(group => {
+                group.days.forEach(day => {
+                    if (nameIndex < currentNames.length && currentNames[nameIndex].length > 0) {
+                        day.people = [...currentNames[nameIndex]];
+                        day.isEmpty = false;
+                    }
+                    if (hiddenIndex < currentHiddenStates.length) {
+                        day.hidden = currentHiddenStates[hiddenIndex];
+                    }
+                    nameIndex++;
+                    hiddenIndex++;
+                });
+            });
+            
+            updateMonthYear();
+            initSchedule();
+            showStatus('Fecha aplicada correctamente - Nombres preservados');
+        });
+
+        document.getElementById('loadExcelBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showStatus('Por favor seleccione un archivo Excel', 'error');
+                return;
+            }
+            
+            showStatus('Cargando archivo Excel...');
+            
+            loadExcelManually(file).catch(error => {
+                console.error('Error cargando Excel manualmente:', error);
+                showStatus('Error al cargar el archivo: ' + error.message, 'error');
+            });
+        });
 
         // Inicializar sistemas táctiles
         initializeTouchSystem();
