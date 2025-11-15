@@ -594,6 +594,18 @@
             transform: scale(1.02);
         }
 
+        .calendar-day.day-move-source {
+            border: 3px solid #ffc107;
+            background: #fffbf0;
+            transform: scale(1.02);
+        }
+
+        .calendar-day.day-move-target {
+            border: 3px solid #28a745;
+            background: #f0fff4;
+            transform: scale(1.02);
+        }
+
         .mobile-menu {
             position: fixed;
             background: white;
@@ -641,6 +653,21 @@
             pointer-events: none;
             opacity: 0.8;
             transform: translate(-50%, -50%);
+        }
+
+        .day-drag-ghost {
+            position: fixed;
+            background: #fffbf0;
+            border: 3px dashed #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0.9;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            min-width: 150px;
+            text-align: center;
         }
 
         @media (max-width: 1200px) {
@@ -828,6 +855,10 @@
         let draggedPersonElement = null;
         let dragGhost = null;
         let startTouch = null;
+        
+        // Variables para movimiento de días
+        let dayMoveMode = false;
+        let sourceDayForMove = null;
 
         // Función para verificar si un día tiene solo nombres "Vacio"
         function hasOnlyVacioNames(dayData) {
@@ -1306,7 +1337,7 @@
             showStatus(`Día ${dayData.hidden ? 'oculto' : 'mostrado'} correctamente`);
         }
 
-        // SISTEMA TÁCTIL MEJORADO
+        // SISTEMA TÁCTIL MEJORADO PARA PERSONAS
         function initializeTouchSystem() {
             // Eventos para personas
             document.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -1316,7 +1347,7 @@
         }
 
         function handleTouchStart(e) {
-            if (!isLoggedIn) return;
+            if (!isLoggedIn || dayMoveMode) return;
             
             const touch = e.touches[0];
             const target = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -1333,7 +1364,7 @@
         }
 
         function handleTouchMove(e) {
-            if (!startTouch) return;
+            if (!startTouch || dayMoveMode) return;
             
             const touch = e.touches[0];
             const deltaX = Math.abs(touch.clientX - startTouch.x);
@@ -1479,44 +1510,47 @@
             draggedPerson = null;
         }
 
-        // SISTEMA DE MOVIMIENTO DE DÍAS COMPLETOS (TÁCTIL)
+        // SISTEMA DE MOVIMIENTO DE DÍAS COMPLETOS (TÁCTIL) - CORREGIDO
         function initializeDayTouchSystem() {
-            let dayTouchStart = null;
-            let dayDragging = false;
-            
             document.addEventListener('touchstart', function(e) {
-                if (!isLoggedIn) return;
+                if (!isLoggedIn || touchDragging) return;
                 
                 const touch = e.touches[0];
                 const target = document.elementFromPoint(touch.clientX, touch.clientY);
                 const dayElement = target ? target.closest('.calendar-day') : null;
                 
                 if (dayElement && !dayElement.classList.contains('hidden') && !dayElement.classList.contains('empty')) {
-                    dayTouchStart = {
+                    // Guardar información del día tocado
+                    const groupIdx = parseInt(dayElement.dataset.group);
+                    const dayIdx = parseInt(dayElement.dataset.day);
+                    
+                    startTouch = {
                         element: dayElement,
                         x: touch.clientX,
                         y: touch.clientY,
-                        time: Date.now()
+                        time: Date.now(),
+                        groupIdx: groupIdx,
+                        dayIdx: dayIdx
                     };
                 }
             }, { passive: true });
             
             document.addEventListener('touchend', function(e) {
-                if (!dayTouchStart) return;
+                if (!startTouch || touchDragging) return;
                 
                 const touch = e.changedTouches[0];
-                const duration = Date.now() - dayTouchStart.time;
+                const duration = Date.now() - startTouch.time;
                 const distance = Math.sqrt(
-                    Math.pow(touch.clientX - dayTouchStart.x, 2) + 
-                    Math.pow(touch.clientY - dayTouchStart.y, 2)
+                    Math.pow(touch.clientX - startTouch.x, 2) + 
+                    Math.pow(touch.clientY - startTouch.y, 2)
                 );
                 
-                // Si fue un tap largo (más de 500ms) y poco movimiento
-                if (duration > 500 && distance < 10) {
-                    showDayOptions(dayTouchStart.element, touch);
+                // Si fue un tap largo (más de 800ms) y poco movimiento
+                if (duration > 800 && distance < 20) {
+                    showDayOptions(startTouch.element, touch);
                 }
                 
-                dayTouchStart = null;
+                startTouch = null;
             }, { passive: true });
         }
 
@@ -1532,12 +1566,12 @@
             
             menu.innerHTML = `
                 <div style="margin-bottom: 8px; font-weight: bold; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                    ${dayData.day}
+                    ${dayData.day.split(' ')[0]} <!-- Solo el nombre del día -->
                 </div>
                 <button class="mobile-menu-btn" data-action="add">➕ Agregar persona</button>
                 <button class="mobile-menu-btn" data-action="remove">➖ Quitar persona</button>
                 <button class="mobile-menu-btn" data-action="toggle">${dayData.hidden ? '👁️ Mostrar' : '👁️ Ocultar'} día</button>
-                <button class="mobile-menu-btn" data-action="moveDay">↔️ Mover día completo</button>
+                <button class="mobile-menu-btn" data-action="moveDay">🔄 Mover día completo</button>
                 <button class="mobile-menu-btn cancel" data-action="cancel">❌ Cancelar</button>
             `;
             
@@ -1580,57 +1614,89 @@
         }
 
         function startDayMove(sourceGroupIdx, sourceDayIdx) {
-            showStatus('Toque en el día destino para intercambiar');
+            dayMoveMode = true;
+            sourceDayForMove = { groupIdx: sourceGroupIdx, dayIdx: sourceDayIdx };
             
+            // Resaltar día origen
             const sourceElement = document.querySelector(`.calendar-day[data-group="${sourceGroupIdx}"][data-day="${sourceDayIdx}"]`);
             if (sourceElement) {
-                sourceElement.style.boxShadow = '0 0 0 3px #ffc107';
+                sourceElement.classList.add('day-move-source');
             }
             
+            // Resaltar días destino posibles
             document.querySelectorAll('.calendar-day').forEach(day => {
                 const targetGroupIdx = parseInt(day.dataset.group);
                 const targetDayIdx = parseInt(day.dataset.day);
                 
-                if (!(sourceGroupIdx === targetGroupIdx && sourceDayIdx === targetDayIdx)) {
-                    day.style.boxShadow = '0 0 0 3px #28a745';
-                    day.style.cursor = 'pointer';
+                if (!(sourceGroupIdx === targetGroupIdx && sourceDayIdx === targetDayIdx) &&
+                    !day.classList.contains('hidden') && !day.classList.contains('empty')) {
+                    day.classList.add('day-move-target');
                     
-                    const clickHandler = function() {
-                        const sourceData = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
-                        const targetData = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
-                        
-                        const sourceOriginalDate = new Date(sourceData.originalDate);
-                        const targetOriginalDate = new Date(targetData.originalDate);
-                        
-                        const tempPeople = [...sourceData.people];
-                        const tempIsEmpty = sourceData.isEmpty;
-                        const tempHidden = sourceData.hidden;
-                        
-                        sourceData.people = [...targetData.people];
-                        sourceData.isEmpty = targetData.isEmpty;
-                        sourceData.hidden = targetData.hidden;
-                        
-                        targetData.people = tempPeople;
-                        targetData.isEmpty = tempIsEmpty;
-                        targetData.hidden = tempHidden;
-                        
-                        updateDayHeader(sourceData, sourceOriginalDate);
-                        updateDayHeader(targetData, targetOriginalDate);
-                        
-                        // Limpiar estilos
-                        document.querySelectorAll('.calendar-day').forEach(d => {
-                            d.style.boxShadow = '';
-                            d.style.cursor = '';
-                            d.removeEventListener('click', clickHandler);
-                        });
-                        
-                        initSchedule();
-                        showStatus('Día movido correctamente');
-                    };
-                    
-                    day.addEventListener('click', clickHandler);
+                    // Agregar evento de click para seleccionar destino
+                    day.addEventListener('click', handleDayMoveSelection);
                 }
             });
+            
+            showStatus('Seleccione el día destino para intercambiar');
+        }
+
+        function handleDayMoveSelection(e) {
+            if (!dayMoveMode || !sourceDayForMove) return;
+            
+            const targetElement = e.currentTarget;
+            const targetGroupIdx = parseInt(targetElement.dataset.group);
+            const targetDayIdx = parseInt(targetElement.dataset.day);
+            
+            // Intercambiar los días
+            swapDays(
+                sourceDayForMove.groupIdx, 
+                sourceDayForMove.dayIdx, 
+                targetGroupIdx, 
+                targetDayIdx
+            );
+            
+            // Limpiar modo de movimiento
+            cleanupDayMoveMode();
+        }
+
+        function swapDays(sourceGroupIdx, sourceDayIdx, targetGroupIdx, targetDayIdx) {
+            const sourceData = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
+            const targetData = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            // Guardar las fechas originales
+            const sourceOriginalDate = new Date(sourceData.originalDate);
+            const targetOriginalDate = new Date(targetData.originalDate);
+            
+            // Intercambiar datos
+            const tempPeople = [...sourceData.people];
+            const tempIsEmpty = sourceData.isEmpty;
+            const tempHidden = sourceData.hidden;
+            
+            sourceData.people = [...targetData.people];
+            sourceData.isEmpty = targetData.isEmpty;
+            sourceData.hidden = targetData.hidden;
+            
+            targetData.people = tempPeople;
+            targetData.isEmpty = tempIsEmpty;
+            targetData.hidden = tempHidden;
+            
+            // Restaurar las fechas en los encabezados
+            updateDayHeader(sourceData, sourceOriginalDate);
+            updateDayHeader(targetData, targetOriginalDate);
+            
+            initSchedule();
+            showStatus('Días intercambiados correctamente');
+        }
+
+        function cleanupDayMoveMode() {
+            // Remover estilos y eventos
+            document.querySelectorAll('.calendar-day').forEach(day => {
+                day.classList.remove('day-move-source', 'day-move-target');
+                day.removeEventListener('click', handleDayMoveSelection);
+            });
+            
+            dayMoveMode = false;
+            sourceDayForMove = null;
         }
 
         function updateDayHeader(dayData, date) {
