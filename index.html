@@ -113,6 +113,19 @@
             display: flex;
             flex-direction: column;
             touch-action: pan-y;
+            cursor: grab;
+        }
+
+        .calendar-day.dragging {
+            opacity: 0.7;
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            cursor: grabbing;
+        }
+
+        .calendar-day.day-drop-zone {
+            border: 3px dashed #28a745;
+            background: #f0fff4;
         }
 
         .download-mode .day-actions,
@@ -192,6 +205,9 @@
             user-select: none;
             -webkit-user-select: none;
             position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .person-item:hover {
@@ -201,7 +217,9 @@
 
         .person-item.dragging {
             opacity: 0.5;
-            background: #cce7ff;
+            background: #cce7ff !important;
+            transform: scale(1.05);
+            z-index: 1000;
         }
 
         .person-item.drag-over {
@@ -221,6 +239,34 @@
             color: #00b4db;
             font-weight: bold;
             text-align: center;
+        }
+
+        .delete-person-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .person-item.selected .delete-person-btn {
+            display: flex;
+        }
+
+        .delete-person-btn:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        .person-name {
+            flex-grow: 1;
         }
 
         .group-header {
@@ -471,6 +517,16 @@
             transform: scale(1.1);
         }
 
+        .custom-add-btn {
+            background: #17a2b8 !important;
+            color: white;
+        }
+
+        .custom-add-btn:hover {
+            background: #138496 !important;
+            transform: scale(1.1);
+        }
+
         .person-count {
             position: absolute;
             top: 6px;
@@ -503,6 +559,7 @@
             flex-direction: column;
             gap: 2px;
             margin-top: 5px;
+            position: relative;
         }
 
         .font-controls {
@@ -606,6 +663,121 @@
             background: #e3f2fd;
         }
 
+        /* Nuevos estilos para el sistema de drag & drop mejorado */
+        .drop-indicator {
+            height: 3px;
+            background: #28a745;
+            margin: 2px 0;
+            border-radius: 2px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .drop-indicator.visible {
+            opacity: 1;
+        }
+        
+        .drop-indicator.top {
+            margin-top: 0;
+        }
+        
+        .drop-indicator.bottom {
+            margin-bottom: 0;
+        }
+        
+        .calendar-day.drop-zone {
+            border: 2px dashed #28a745;
+            background: #f8fff8;
+        }
+        
+        .person-list.drop-zone {
+            min-height: 20px;
+            border: 1px dashed #007bff;
+            background: #f0f8ff;
+        }
+
+        /* Estilos para el modal de selección de personas */
+        .person-select-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .person-select-modal.active {
+            display: flex;
+        }
+
+        .person-select-box {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .person-select-box h2 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+            font-size: 1.6em;
+        }
+
+        .person-list-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        .person-option {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .person-option:hover {
+            background: #e9ecef;
+            transform: scale(1.02);
+        }
+
+        .person-option.selected {
+            background: #cce7ff;
+            border-color: #007bff;
+        }
+
+        .search-box {
+            margin-bottom: 15px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #00b4db;
+        }
+
         /* Estilos para el sistema táctil */
         .person-item.touch-dragging {
             position: fixed;
@@ -652,7 +824,7 @@
             padding: 10px;
             margin: 2px 0;
             border: none;
-            border-radius: 4px;
+                    border-radius: 4px;
             background: #00b4db;
             color: white;
             font-size: 14px;
@@ -751,6 +923,12 @@
             /* En móviles, las flechas siempre visibles */
             .calendar-day .position-controls {
                 opacity: 1 !important;
+            }
+
+            .delete-person-btn {
+                width: 20px;
+                height: 20px;
+                font-size: 12px;
             }
         }
 
@@ -865,6 +1043,21 @@
         </div>
     </div>
 
+    <!-- NUEVO MODAL PARA SELECCIONAR PERSONA -->
+    <div class="person-select-modal" id="personSelectModal">
+        <div class="person-select-box">
+            <h2>Seleccionar Persona</h2>
+            <div class="search-box">
+                <input type="text" id="personSearch" placeholder="Buscar persona...">
+            </div>
+            <div class="person-list-container" id="personListContainer">
+                <!-- Las opciones de personas se cargarán aquí -->
+            </div>
+            <button class="btn btn-primary" id="confirmPersonBtn" style="width: 100%;">Agregar Persona Seleccionada</button>
+            <button class="btn btn-danger" id="cancelPersonBtn" style="width: 100%; margin-top: 10px;">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         // Variables globales
         let persons = [];
@@ -899,6 +1092,26 @@
         // Variables para el sistema
         let selectedPerson = null;
         let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // Variables para el sistema de drag & drop mejorado
+        let dragState = {
+            isDragging: false,
+            draggedElement: null,
+            sourceGroupIdx: null,
+            sourceDayIdx: null,
+            sourcePersonIdx: null
+        };
+
+        // Variables para el modal de selección de personas
+        let currentDayForPersonAdd = null;
+
+        // Variables para el drag & drop de días completos
+        let dayDragState = {
+            isDragging: false,
+            draggedDay: null,
+            sourceGroupIdx: null,
+            sourceDayIdx: null
+        };
 
         // Función para verificar si un día tiene solo nombres "Vacio"
         function hasOnlyVacioNames(dayData) {
@@ -1238,6 +1451,40 @@
             });
         }
 
+        // NUEVA FUNCIÓN: Eliminar persona seleccionada
+        function deleteSelectedPerson() {
+            if (!selectedPerson) {
+                showStatus('Primero seleccione una persona', 'error');
+                return;
+            }
+            
+            const groupIdx = parseInt(selectedPerson.dataset.group);
+            const dayIdx = parseInt(selectedPerson.dataset.day);
+            const personIndex = parseInt(selectedPerson.dataset.index);
+            
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            
+            if (personIndex < 0 || personIndex >= dayData.people.length) {
+                showStatus('Índice de persona inválido', 'error');
+                return;
+            }
+            
+            const deletedPerson = dayData.people[personIndex];
+            
+            // Eliminar la persona
+            dayData.people.splice(personIndex, 1);
+            dayData.isEmpty = dayData.people.length === 0;
+            
+            // Si el día queda vacío y solo tenía "Vacio", ocultarlo
+            if (dayData.isEmpty && hasOnlyVacioNames(dayData)) {
+                dayData.hidden = true;
+            }
+            
+            selectedPerson = null;
+            initSchedule();
+            showStatus(`Persona "${deletedPerson}" eliminada correctamente`);
+        }
+
         // Obtener el siguiente cuadro
         function getNextDay(groupIdx, dayIdx) {
             const group = scheduleData.groups[groupIdx];
@@ -1397,7 +1644,7 @@
                 dayElement.classList.add('show-position-controls');
             }
             
-            showStatus(`Persona seleccionada: ${personElement.textContent}. Use las flechas para mover.`);
+            showStatus(`Persona seleccionada: ${personElement.textContent}. Use las flechas para mover o X para eliminar.`);
         }
 
         function movePersonUp() {
@@ -1470,95 +1717,468 @@
             showStatus(`Persona movida hacia abajo`);
         }
 
-        // DRAG & DROP PARA DESKTOP
-        function initializeDesktopDragDrop() {
-            if (isMobileDevice) return;
+        // NUEVO: Sistema de drag & drop para días completos
+        function initializeDayDragDrop() {
+            if (isMobileDevice) return; // Solo en desktop
             
-            let draggedElement = null;
-            
-            document.addEventListener('dragstart', function(e) {
-                if (!isLoggedIn) return;
+            document.querySelectorAll('.calendar-day').forEach(dayElement => {
+                // Solo permitir arrastrar días que no estén vacíos u ocultos
+                const groupIdx = parseInt(dayElement.dataset.group);
+                const dayIdx = parseInt(dayElement.dataset.day);
+                const dayData = scheduleData.groups[groupIdx].days[dayIdx];
                 
-                if (e.target.classList.contains('person-item')) {
-                    draggedElement = e.target;
-                    e.target.classList.add('dragging');
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', '');
-                }
-            });
-            
-            document.addEventListener('dragend', function(e) {
-                if (draggedElement) {
-                    draggedElement.classList.remove('dragging');
-                    draggedElement = null;
-                }
-                document.querySelectorAll('.calendar-day.drag-over').forEach(day => {
-                    day.classList.remove('drag-over');
-                });
-            });
-            
-            document.addEventListener('dragover', function(e) {
-                if (!isLoggedIn || !draggedElement) return;
-                e.preventDefault();
-                
-                const dayElement = e.target.closest('.calendar-day');
-                if (dayElement && !dayElement.classList.contains('hidden') && !dayElement.classList.contains('empty')) {
-                    const targetGroupIdx = parseInt(dayElement.dataset.group);
-                    const targetDayIdx = parseInt(dayElement.dataset.day);
-                    const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+                if (!dayData.hidden && !dayData.isEmpty) {
+                    dayElement.draggable = true;
                     
-                    if (targetDay.people.length < 4) {
-                        e.dataTransfer.dropEffect = 'move';
-                        dayElement.classList.add('drag-over');
+                    dayElement.addEventListener('dragstart', function(e) {
+                        if (!isLoggedIn) return;
+                        
+                        dayDragState.isDragging = true;
+                        dayDragState.draggedDay = this;
+                        dayDragState.sourceGroupIdx = groupIdx;
+                        dayDragState.sourceDayIdx = dayIdx;
+                        
+                        this.classList.add('dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', '');
+                    });
+                    
+                    dayElement.addEventListener('dragend', function(e) {
+                        dayDragState.isDragging = false;
+                        dayDragState.draggedDay = null;
+                        this.classList.remove('dragging');
+                        
+                        // Limpiar zonas de drop
+                        document.querySelectorAll('.calendar-day.day-drop-zone').forEach(day => {
+                            day.classList.remove('day-drop-zone');
+                        });
+                    });
+                }
+            });
+
+            // Eventos para los días como zonas de drop
+            document.querySelectorAll('.calendar-day').forEach(dayElement => {
+                dayElement.addEventListener('dragover', function(e) {
+                    if (!dayDragState.isDragging || !isLoggedIn) return;
+                    
+                    e.preventDefault();
+                    const targetGroupIdx = parseInt(this.dataset.group);
+                    const targetDayIdx = parseInt(this.dataset.day);
+                    
+                    // No permitir soltar en el mismo día
+                    if (targetGroupIdx === dayDragState.sourceGroupIdx && targetDayIdx === dayDragState.sourceDayIdx) {
+                        return;
                     }
-                }
-            });
-            
-            document.addEventListener('dragleave', function(e) {
-                const dayElement = e.target.closest('.calendar-day');
-                if (dayElement) {
-                    dayElement.classList.remove('drag-over');
-                }
-            });
-            
-            document.addEventListener('drop', function(e) {
-                e.preventDefault();
-                if (!isLoggedIn || !draggedElement) return;
-                
-                const dayElement = e.target.closest('.calendar-day');
-                if (dayElement && dayElement.classList.contains('drag-over')) {
-                    const sourceGroupIdx = parseInt(draggedElement.dataset.group);
-                    const sourceDayIdx = parseInt(draggedElement.dataset.day);
-                    const personIndex = parseInt(draggedElement.dataset.index);
-                    const targetGroupIdx = parseInt(dayElement.dataset.group);
-                    const targetDayIdx = parseInt(dayElement.dataset.day);
                     
-                    movePersonToDay(sourceGroupIdx, sourceDayIdx, personIndex, targetGroupIdx, targetDayIdx);
-                }
+                    this.classList.add('day-drop-zone');
+                    e.dataTransfer.dropEffect = 'move';
+                });
                 
-                document.querySelectorAll('.calendar-day.drag-over').forEach(day => {
-                    day.classList.remove('drag-over');
+                dayElement.addEventListener('dragleave', function(e) {
+                    this.classList.remove('day-drop-zone');
+                });
+                
+                dayElement.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    
+                    if (!dayDragState.isDragging || !isLoggedIn) return;
+                    
+                    const targetGroupIdx = parseInt(this.dataset.group);
+                    const targetDayIdx = parseInt(this.dataset.day);
+                    
+                    // Intercambiar los datos de los días
+                    swapDays(
+                        dayDragState.sourceGroupIdx, 
+                        dayDragState.sourceDayIdx,
+                        targetGroupIdx,
+                        targetDayIdx
+                    );
+                    
+                    this.classList.remove('day-drop-zone');
                 });
             });
         }
 
-        function movePersonToDay(sourceGroupIdx, sourceDayIdx, personIndex, targetGroupIdx, targetDayIdx) {
+        // NUEVA FUNCIÓN: Intercambiar días completos
+        function swapDays(sourceGroupIdx, sourceDayIdx, targetGroupIdx, targetDayIdx) {
             const sourceDay = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
             const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
             
+            // Intercambiar los datos
+            const tempPeople = [...sourceDay.people];
+            const tempIsEmpty = sourceDay.isEmpty;
+            const tempHidden = sourceDay.hidden;
+            
+            sourceDay.people = [...targetDay.people];
+            sourceDay.isEmpty = targetDay.isEmpty;
+            sourceDay.hidden = targetDay.hidden;
+            
+            targetDay.people = tempPeople;
+            targetDay.isEmpty = tempIsEmpty;
+            targetDay.hidden = tempHidden;
+            
+            initSchedule();
+            showStatus('Días intercambiados correctamente');
+        }
+
+        // SISTEMA DE DRAG & DROP MEJORADO PARA DESKTOP
+        function initializeDesktopDragDrop() {
+            // Inicializar arrastre para días (para mover todo el contenido)
+            document.querySelectorAll('.calendar-day').forEach(dayElement => {
+                dayElement.addEventListener('dragover', handleDayDragOver);
+                dayElement.addEventListener('dragleave', handleDayDragLeave);
+                dayElement.addEventListener('drop', handleDayDrop);
+            });
+        }
+
+        function initializeDesktopPersonDragDrop(personElement) {
+            personElement.addEventListener('dragstart', function(e) {
+                if (!isLoggedIn) return;
+                
+                dragState.isDragging = true;
+                dragState.draggedElement = this;
+                dragState.sourceGroupIdx = parseInt(this.dataset.group);
+                dragState.sourceDayIdx = parseInt(this.dataset.day);
+                dragState.sourcePersonIdx = parseInt(this.dataset.index);
+                
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', '');
+            });
+            
+            personElement.addEventListener('dragend', function(e) {
+                dragState.isDragging = false;
+                dragState.draggedElement = null;
+                this.classList.remove('dragging');
+                
+                // Limpiar todos los indicadores
+                document.querySelectorAll('.drop-indicator.visible').forEach(indicator => {
+                    indicator.classList.remove('visible');
+                });
+                document.querySelectorAll('.calendar-day.drop-zone').forEach(day => {
+                    day.classList.remove('drop-zone');
+                });
+                document.querySelectorAll('.person-list.drop-zone').forEach(list => {
+                    list.classList.remove('drop-zone');
+                });
+            });
+        }
+
+        function handleDayDragOver(e) {
+            if (!dragState.isDragging || !isLoggedIn) return;
+            
+            e.preventDefault();
+            const dayElement = e.target.closest('.calendar-day');
+            if (!dayElement || dayElement.classList.contains('hidden')) return;
+            
+            const targetGroupIdx = parseInt(dayElement.dataset.group);
+            const targetDayIdx = parseInt(dayElement.dataset.day);
+            const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            // Permitir soltar si el día está vacío o tiene menos de 4 personas
+            if (targetDay.isEmpty || targetDay.people.length < 4) {
+                dayElement.classList.add('drop-zone');
+                e.dataTransfer.dropEffect = 'move';
+            }
+        }
+
+        function handleDayDragLeave(e) {
+            const dayElement = e.target.closest('.calendar-day');
+            if (dayElement) {
+                dayElement.classList.remove('drop-zone');
+            }
+        }
+
+        function handleDayDrop(e) {
+            e.preventDefault();
+            
+            if (!dragState.isDragging || !isLoggedIn) return;
+            
+            const dayElement = e.target.closest('.calendar-day');
+            if (!dayElement) return;
+            
+            const targetGroupIdx = parseInt(dayElement.dataset.group);
+            const targetDayIdx = parseInt(dayElement.dataset.day);
+            
+            // CORREGIDO: Solo mover la persona específica, no todo el contenido
+            movePersonToDay(
+                dragState.sourceGroupIdx, 
+                dragState.sourceDayIdx, 
+                dragState.sourcePersonIdx, 
+                targetGroupIdx, 
+                targetDayIdx,
+                -1 // -1 indica agregar al final
+            );
+            
+            dayElement.classList.remove('drop-zone');
+        }
+
+        // SISTEMA DE DRAG & DROP MEJORADO CON POSICIONAMIENTO
+        function initializePersonListDragDrop() {
+            document.querySelectorAll('.person-list').forEach(personList => {
+                personList.addEventListener('dragover', handlePersonListDragOver);
+                personList.addEventListener('dragleave', handlePersonListDragLeave);
+                personList.addEventListener('drop', handlePersonListDrop);
+            });
+        }
+
+        function handlePersonListDragOver(e) {
+            if (!dragState.isDragging || !isLoggedIn) return;
+            
+            e.preventDefault();
+            const personList = e.target.closest('.person-list');
+            if (!personList) return;
+            
+            const dayElement = personList.closest('.calendar-day');
+            const targetGroupIdx = parseInt(dayElement.dataset.group);
+            const targetDayIdx = parseInt(dayElement.dataset.day);
+            const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            // Solo permitir si hay espacio
+            if (targetDay.people.length >= 4) return;
+            
+            personList.classList.add('drop-zone');
+            
+            // Calcular posición de drop
+            const rect = personList.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+            
+            // Determinar posición (arriba, medio, abajo)
+            const position = calculateDropPosition(y, height, personList.children.length);
+            
+            // Mostrar indicador en la posición correcta
+            updateDropIndicators(personList, position);
+            
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handlePersonListDragLeave(e) {
+            const personList = e.target.closest('.person-list');
+            if (personList) {
+                personList.classList.remove('drop-zone');
+                hideAllDropIndicators(personList);
+            }
+        }
+
+        function handlePersonListDrop(e) {
+            e.preventDefault();
+            
+            if (!dragState.isDragging || !isLoggedIn) return;
+            
+            const personList = e.target.closest('.person-list');
+            if (!personList) return;
+            
+            const dayElement = personList.closest('.calendar-day');
+            const targetGroupIdx = parseInt(dayElement.dataset.group);
+            const targetDayIdx = parseInt(dayElement.dataset.day);
+            
+            // Calcular posición de drop
+            const rect = personList.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+            
+            // Determinar posición (arriba, medio, abajo)
+            const position = calculateDropPosition(y, height, personList.children.length);
+            
+            // CORREGIDO: Solo mover la persona específica
+            movePersonToDay(
+                dragState.sourceGroupIdx, 
+                dragState.sourceDayIdx, 
+                dragState.sourcePersonIdx, 
+                targetGroupIdx, 
+                targetDayIdx,
+                position
+            );
+            
+            personList.classList.remove('drop-zone');
+            hideAllDropIndicators(personList);
+        }
+
+        function calculateDropPosition(y, height, childCount) {
+            const segmentHeight = height / childCount;
+            const segmentIndex = Math.floor(y / segmentHeight);
+            
+            // Si estamos en la primera mitad del primer segmento, posición 0 (arriba)
+            if (segmentIndex === 0 && y < segmentHeight / 2) {
+                return 0;
+            }
+            
+            // Si estamos en la segunda mitad del último segmento, posición -1 (abajo)
+            if (segmentIndex === childCount - 1 && y > height - segmentHeight / 2) {
+                return -1;
+            }
+            
+            // En cualquier otro caso, posición media (después del elemento en segmentIndex)
+            return segmentIndex;
+        }
+
+        function updateDropIndicators(personList, position) {
+            // Ocultar todos los indicadores primero
+            hideAllDropIndicators(personList);
+            
+            // Mostrar el indicador en la posición correcta
+            const indicators = personList.querySelectorAll('.drop-indicator');
+            
+            if (position === 0) {
+                // Arriba del todo
+                if (indicators[0]) indicators[0].classList.add('visible');
+            } else if (position === -1) {
+                // Abajo del todo
+                if (indicators[indicators.length - 1]) indicators[indicators.length - 1].classList.add('visible');
+            } else {
+                // En medio (después del elemento en posición-1)
+                if (indicators[position]) indicators[position].classList.add('visible');
+            }
+        }
+
+        function hideAllDropIndicators(personList) {
+            personList.querySelectorAll('.drop-indicator.visible').forEach(indicator => {
+                indicator.classList.remove('visible');
+            });
+        }
+
+        // Función mejorada para mover persona a un día específico
+        function movePersonToDay(sourceGroupIdx, sourceDayIdx, sourcePersonIdx, targetGroupIdx, targetDayIdx, targetPosition) {
+            const sourceDay = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
+            const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+            
+            // Verificar que el día destino no esté oculto
+            if (targetDay.hidden) {
+                targetDay.hidden = false; // Mostrar el día si estaba oculto
+            }
+            
+            // Verificar límite de personas
             if (targetDay.people.length >= 4) {
                 showStatus('No se puede mover: día destino ya tiene 4 personas', 'error');
                 return;
             }
             
-            const movedPerson = sourceDay.people.splice(personIndex, 1)[0];
-            targetDay.people.push(movedPerson);
+            // CORREGIDO: Solo mover la persona específica, no todo el contenido
+            const movedPerson = sourceDay.people.splice(sourcePersonIdx, 1)[0];
             
+            // Insertar en la posición correcta
+            if (targetPosition === -1) {
+                // Agregar al final
+                targetDay.people.push(movedPerson);
+            } else if (targetPosition === 0) {
+                // Agregar al principio
+                targetDay.people.unshift(movedPerson);
+            } else {
+                // Insertar en posición específica
+                targetDay.people.splice(targetPosition, 0, movedPerson);
+            }
+            
+            // Actualizar estados
             sourceDay.isEmpty = sourceDay.people.length === 0;
             targetDay.isEmpty = false;
             
+            // Si el día origen queda vacío, ocultarlo automáticamente si solo tiene "Vacio"
+            if (sourceDay.isEmpty && hasOnlyVacioNames(sourceDay)) {
+                sourceDay.hidden = true;
+            }
+            
             initSchedule();
             showStatus(`Persona "${movedPerson}" movida correctamente`);
+        }
+
+        // NUEVA FUNCIÓN: Abrir modal para seleccionar persona
+        function openPersonSelectModal(groupIdx, dayIdx) {
+            if (!isLoggedIn) {
+                showStatus('Debe iniciar sesión para agregar personas personalizadas', 'error');
+                return;
+            }
+            
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            if (dayData.people.length >= 4) {
+                showStatus('Máximo 4 personas por día', 'error');
+                return;
+            }
+            
+            currentDayForPersonAdd = { groupIdx, dayIdx };
+            
+            // Limpiar y cargar la lista de personas
+            const container = document.getElementById('personListContainer');
+            container.innerHTML = '';
+            
+            // Filtrar personas que no están ya en el día
+            const availablePersons = persons.filter(person => 
+                !dayData.people.includes(person.name)
+            );
+            
+            if (availablePersons.length === 0) {
+                container.innerHTML = '<p>No hay personas disponibles para agregar</p>';
+            } else {
+                availablePersons.forEach(person => {
+                    const option = document.createElement('div');
+                    option.className = 'person-option';
+                    option.textContent = person.name;
+                    option.dataset.personName = person.name;
+                    option.addEventListener('click', function() {
+                        // Toggle selección
+                        document.querySelectorAll('.person-option').forEach(opt => {
+                            opt.classList.remove('selected');
+                        });
+                        this.classList.add('selected');
+                    });
+                    container.appendChild(option);
+                });
+            }
+            
+            // Limpiar búsqueda
+            document.getElementById('personSearch').value = '';
+            
+            // Mostrar modal
+            document.getElementById('personSelectModal').classList.add('active');
+        }
+
+        // NUEVA FUNCIÓN: Agregar persona seleccionada
+        function addSelectedPerson() {
+            if (!currentDayForPersonAdd) return;
+            
+            const selectedOption = document.querySelector('.person-option.selected');
+            if (!selectedOption) {
+                showStatus('Por favor seleccione una persona', 'error');
+                return;
+            }
+            
+            const personName = selectedOption.dataset.personName;
+            const { groupIdx, dayIdx } = currentDayForPersonAdd;
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            
+            // Verificar que no exceda el límite
+            if (dayData.people.length >= 4) {
+                showStatus('Máximo 4 personas por día', 'error');
+                return;
+            }
+            
+            // Agregar la persona
+            dayData.people.push(personName);
+            dayData.isEmpty = false;
+            dayData.hidden = false; // Asegurar que el día se muestre
+            
+            // Cerrar modal y actualizar
+            document.getElementById('personSelectModal').classList.remove('active');
+            initSchedule();
+            showStatus(`Persona "${personName}" agregada correctamente`);
+        }
+
+        // NUEVA FUNCIÓN: Buscar personas
+        function setupPersonSearch() {
+            const searchInput = document.getElementById('personSearch');
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const options = document.querySelectorAll('.person-option');
+                
+                options.forEach(option => {
+                    const personName = option.dataset.personName.toLowerCase();
+                    if (personName.includes(searchTerm)) {
+                        option.style.display = 'block';
+                    } else {
+                        option.style.display = 'none';
+                    }
+                });
+            });
         }
 
         // Inicializar el cronograma
@@ -1649,6 +2269,11 @@
                         const personList = document.createElement('div');
                         personList.className = 'person-list';
                         
+                        // Agregar indicadores de drop
+                        const topIndicator = document.createElement('div');
+                        topIndicator.className = 'drop-indicator top';
+                        personList.appendChild(topIndicator);
+                        
                         if (dayData.people.length === 4) {
                             const morningLabel = document.createElement('div');
                             morningLabel.className = 'time-label';
@@ -1658,6 +2283,13 @@
                             dayData.people.slice(0, 2).forEach((person, index) => {
                                 const personDiv = createPersonElement(person, groupIdx, dayIdx, index);
                                 personList.appendChild(personDiv);
+                                
+                                // Agregar indicador después de cada persona
+                                if (index < 1) {
+                                    const indicator = document.createElement('div');
+                                    indicator.className = 'drop-indicator';
+                                    personList.appendChild(indicator);
+                                }
                             });
                             
                             const afternoonLabel = document.createElement('div');
@@ -1668,13 +2300,32 @@
                             dayData.people.slice(2, 4).forEach((person, index) => {
                                 const personDiv = createPersonElement(person, groupIdx, dayIdx, index + 2);
                                 personList.appendChild(personDiv);
+                                
+                                // Agregar indicador después de cada persona
+                                if (index < 1) {
+                                    const indicator = document.createElement('div');
+                                    indicator.className = 'drop-indicator';
+                                    personList.appendChild(indicator);
+                                }
                             });
                         } else {
                             dayData.people.forEach((person, index) => {
                                 const personDiv = createPersonElement(person, groupIdx, dayIdx, index);
                                 personList.appendChild(personDiv);
+                                
+                                // Agregar indicador después de cada persona
+                                if (index < dayData.people.length - 1) {
+                                    const indicator = document.createElement('div');
+                                    indicator.className = 'drop-indicator';
+                                    personList.appendChild(indicator);
+                                }
                             });
                         }
+                        
+                        // Agregar indicador final
+                        const bottomIndicator = document.createElement('div');
+                        bottomIndicator.className = 'drop-indicator bottom';
+                        personList.appendChild(bottomIndicator);
                         
                         content.appendChild(personList);
                     }
@@ -1690,10 +2341,21 @@
                     actionButtons.className = 'day-actions';
                     
                     if (isLoggedIn) {
+                        // Botón para agregar persona personalizada
+                        const customAddBtn = document.createElement('button');
+                        customAddBtn.className = 'action-btn custom-add-btn';
+                        customAddBtn.innerHTML = '👤';
+                        customAddBtn.title = 'Agregar persona específica';
+                        customAddBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            openPersonSelectModal(groupIdx, dayIdx);
+                        };
+                        actionButtons.appendChild(customAddBtn);
+                        
                         const addBtn = document.createElement('button');
                         addBtn.className = 'action-btn add-btn';
                         addBtn.innerHTML = '+';
-                        addBtn.title = 'Agregar persona';
+                        addBtn.title = 'Agregar persona automática';
                         addBtn.onclick = (e) => {
                             e.stopPropagation();
                             addPerson(groupIdx, dayIdx);
@@ -1733,20 +2395,46 @@
             });
 
             applyFontStyles();
-            initializeDesktopDragDrop();
+            
+            // Inicializar drag & drop según el dispositivo
+            if (isMobileDevice) {
+                // En móviles solo usamos el sistema de flechas
+            } else {
+                initializeDesktopDragDrop();
+                initializeDayDragDrop(); // NUEVO: Inicializar drag & drop de días
+                setTimeout(() => {
+                    initializePersonListDragDrop();
+                }, 100);
+            }
         }
 
         function createPersonElement(person, groupIdx, dayIdx, index) {
             const personDiv = document.createElement('div');
             personDiv.className = 'person-item';
-            personDiv.textContent = person;
             personDiv.dataset.group = groupIdx;
             personDiv.dataset.day = dayIdx;
             personDiv.dataset.index = index;
             
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'person-name';
+            nameSpan.textContent = person;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-person-btn';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.title = 'Eliminar persona';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                selectPerson(personDiv);
+                deleteSelectedPerson();
+            };
+            
+            personDiv.appendChild(nameSpan);
+            personDiv.appendChild(deleteBtn);
+            
             if (isLoggedIn) {
                 if (isMobileDevice) {
-                    // En móviles: click para seleccionar
+                    // En móviles: click para seleccionar y usar flechas
                     personDiv.addEventListener('click', function(e) {
                         e.stopPropagation();
                         selectPerson(this);
@@ -1760,13 +2448,14 @@
                         e.stopPropagation();
                         selectPerson(this);
                     });
+                    
+                    // Sistema de drag & drop para desktop
+                    initializeDesktopPersonDragDrop(personDiv);
                 }
             }
             
             return personDiv;
         }
-
-        // ... (el resto del código de eventos y funciones se mantiene igual)
 
         // Sistema de login
         document.getElementById('loginSubmit').addEventListener('click', () => {
@@ -2001,6 +2690,13 @@
             document.getElementById('orientationModal').classList.remove('active');
         });
 
+        // NUEVOS EVENT LISTENERS PARA EL MODAL DE PERSONAS
+        document.getElementById('confirmPersonBtn').addEventListener('click', addSelectedPerson);
+        
+        document.getElementById('cancelPersonBtn').addEventListener('click', () => {
+            document.getElementById('personSelectModal').classList.remove('active');
+        });
+
         function downloadImage(orientation) {
             document.querySelector('.container').classList.add('download-mode');
             
@@ -2094,6 +2790,7 @@
 
         // Inicializar aplicación
         loadExcelAutomatically();
+        setupPersonSearch();
     </script>
 </body>
 </html>
