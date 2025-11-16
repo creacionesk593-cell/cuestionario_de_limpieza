@@ -191,7 +191,6 @@
             transition: all 0.2s;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none;
             position: relative;
         }
 
@@ -208,6 +207,12 @@
         .person-item.drag-over {
             background: #e3f2fd;
             border: 2px dashed #00b4db;
+        }
+
+        .person-item.selected {
+            background: #cce7ff;
+            border: 2px solid #007bff;
+            transform: scale(1.05);
         }
 
         .person-item.position-indicator {
@@ -378,6 +383,12 @@
             display: flex;
             gap: 2px;
             flex-direction: column;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .calendar-day.show-position-controls .position-controls {
+            opacity: 1;
         }
 
         .action-btn {
@@ -673,64 +684,6 @@
             transform: translate(-50%, -50%);
         }
 
-        .position-indicator-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .position-indicator-modal.active {
-            display: flex;
-        }
-
-        .position-indicator-box {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-            max-width: 300px;
-            width: 90%;
-            text-align: center;
-        }
-
-        .position-indicator-box h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-
-        .position-options {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 15px;
-        }
-
-        .position-option {
-            padding: 12px;
-            border: 2px solid #dee2e6;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: bold;
-        }
-
-        .position-option:hover {
-            border-color: #00b4db;
-            background: #f0f9ff;
-        }
-
-        .position-option.selected {
-            border-color: #00b4db;
-            background: #e3f2fd;
-        }
-
         @media (max-width: 1200px) {
             .calendar-grid {
                 grid-template-columns: repeat(4, 1fr);
@@ -762,6 +715,7 @@
             .person-item {
                 padding: 8px;
                 font-size: 13px;
+                touch-action: none;
             }
 
             .day-actions {
@@ -779,6 +733,7 @@
                 flex-direction: row;
                 justify-content: center;
                 margin-bottom: 5px;
+                opacity: 1;
             }
 
             .action-btn {
@@ -792,6 +747,11 @@
                 height: 24px;
                 font-size: 12px;
             }
+
+            /* En móviles, las flechas siempre visibles */
+            .calendar-day .position-controls {
+                opacity: 1 !important;
+            }
         }
 
         @media (max-width: 480px) {
@@ -801,6 +761,17 @@
 
             body {
                 padding: 8px;
+            }
+        }
+
+        /* Detectar si es dispositivo táctil */
+        @media (hover: none) and (pointer: coarse) {
+            .person-item {
+                cursor: default;
+            }
+            
+            .calendar-day .position-controls {
+                opacity: 1 !important;
             }
         }
     </style>
@@ -894,20 +865,6 @@
         </div>
     </div>
 
-    <!-- MODAL PARA SELECCIÓN DE POSICIÓN -->
-    <div class="position-indicator-modal" id="positionIndicatorModal">
-        <div class="position-indicator-box">
-            <h3>Seleccione la posición</h3>
-            <div class="position-options">
-                <div class="position-option" data-position="0">⬆️ Arriba del todo</div>
-                <div class="position-option" data-position="1">↕️ En el medio</div>
-                <div class="position-option" data-position="2">⬇️ Abajo del todo</div>
-            </div>
-            <button class="btn btn-primary" id="confirmPositionBtn">Confirmar</button>
-            <button class="btn btn-danger" id="cancelPositionBtn" style="margin-top: 10px;">Cancelar</button>
-        </div>
-    </div>
-
     <script>
         // Variables globales
         let persons = [];
@@ -939,22 +896,9 @@
             startDate: null
         };
 
-        // Variables para el sistema táctil
-        let touchDragging = false;
-        let draggedPerson = null;
-        let draggedPersonElement = null;
-        let dragGhost = null;
-        let startTouch = null;
-        
-        // Variables para movimiento de días
-        let dayMoveMode = false;
-        let sourceDayForMove = null;
-
-        // Variables para control de posición
-        let positionMoveMode = false;
-        let personForPositionMove = null;
-        let targetDayForPosition = null;
-        let selectedPosition = 0;
+        // Variables para el sistema
+        let selectedPerson = null;
+        let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         // Función para verificar si un día tiene solo nombres "Vacio"
         function hasOnlyVacioNames(dayData) {
@@ -1433,307 +1377,169 @@
             showStatus(`Día ${dayData.hidden ? 'oculto' : 'mostrado'} correctamente`);
         }
 
-        // SISTEMA DE CONTROL DE POSICIÓN
-        function startPositionMove(personElement) {
-            const groupIdx = parseInt(personElement.closest('.calendar-day').dataset.group);
-            const dayIdx = parseInt(personElement.closest('.calendar-day').dataset.day);
-            const personIndex = Array.from(personElement.parentNode.children).indexOf(personElement);
+        // SISTEMA DE MOVIMIENTO CON FLECHAS
+        function selectPerson(personElement) {
+            // Deseleccionar persona anterior
+            if (selectedPerson) {
+                selectedPerson.classList.remove('selected');
+            }
             
-            personForPositionMove = {
-                sourceGroup: groupIdx,
-                sourceDay: dayIdx,
-                personIndex: personIndex,
-                personName: personElement.textContent
-            };
+            // Seleccionar nueva persona
+            selectedPerson = personElement;
+            personElement.classList.add('selected');
             
-            showStatus('Seleccione el día destino');
+            // Mostrar controles de posición en el día (solo en desktop)
+            if (!isMobileDevice) {
+                const dayElement = personElement.closest('.calendar-day');
+                document.querySelectorAll('.calendar-day').forEach(day => {
+                    day.classList.remove('show-position-controls');
+                });
+                dayElement.classList.add('show-position-controls');
+            }
             
-            // Resaltar días destino posibles
-            document.querySelectorAll('.calendar-day').forEach(day => {
-                const targetGroupIdx = parseInt(day.dataset.group);
-                const targetDayIdx = parseInt(day.dataset.day);
-                const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
-                
-                if (!(groupIdx === targetGroupIdx && dayIdx === targetDayIdx) &&
-                    !day.classList.contains('hidden') && !day.classList.contains('empty') &&
-                    targetDay.people.length < 4) {
-                    day.classList.add('drop-target');
-                    day.addEventListener('click', handlePositionTargetSelection);
-                }
-            });
+            showStatus(`Persona seleccionada: ${personElement.textContent}. Use las flechas para mover.`);
         }
 
-        function handlePositionTargetSelection(e) {
-            if (!personForPositionMove) return;
-            
-            const targetElement = e.currentTarget;
-            const targetGroupIdx = parseInt(targetElement.dataset.group);
-            const targetDayIdx = parseInt(targetElement.dataset.day);
-            
-            targetDayForPosition = { groupIdx: targetGroupIdx, dayIdx: targetDayIdx };
-            
-            // Limpiar estilos y eventos
-            document.querySelectorAll('.calendar-day').forEach(day => {
-                day.classList.remove('drop-target');
-                day.removeEventListener('click', handlePositionTargetSelection);
-            });
-            
-            showPositionModal();
-        }
-
-        function showPositionModal() {
-            const modal = document.getElementById('positionIndicatorModal');
-            modal.classList.add('active');
-            
-            // Resetear selección
-            selectedPosition = 0;
-            document.querySelectorAll('.position-option').forEach(option => {
-                option.classList.remove('selected');
-                if (parseInt(option.dataset.position) === selectedPosition) {
-                    option.classList.add('selected');
-                }
-            });
-        }
-
-        function hidePositionModal() {
-            const modal = document.getElementById('positionIndicatorModal');
-            modal.classList.remove('active');
-        }
-
-        function movePersonWithPosition(targetGroupIdx, targetDayIdx, position) {
-            if (!personForPositionMove) return;
-            
-            const sourceDay = scheduleData.groups[personForPositionMove.sourceGroup].days[personForPositionMove.sourceDay];
-            const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
-            
-            if (targetDay.people.length >= 4) {
-                showStatus('No se puede mover: día destino ya tiene 4 personas', 'error');
+        function movePersonUp() {
+            if (!selectedPerson) {
+                showStatus('Primero seleccione una persona', 'error');
                 return;
             }
             
-            const movedPerson = sourceDay.people.splice(personForPositionMove.personIndex, 1)[0];
+            const groupIdx = parseInt(selectedPerson.dataset.group);
+            const dayIdx = parseInt(selectedPerson.dataset.day);
+            const personIndex = parseInt(selectedPerson.dataset.index);
             
-            // Insertar en la posición especificada
-            if (position === 0) {
-                // Arriba del todo
-                targetDay.people.unshift(movedPerson);
-            } else if (position === 2) {
-                // Abajo del todo
-                targetDay.people.push(movedPerson);
-            } else {
-                // En medio (posición 1)
-                const middleIndex = Math.floor(targetDay.people.length / 2);
-                targetDay.people.splice(middleIndex, 0, movedPerson);
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            
+            if (personIndex === 0) {
+                showStatus('La persona ya está en la primera posición', 'error');
+                return;
             }
             
-            sourceDay.isEmpty = sourceDay.people.length === 0;
-            targetDay.isEmpty = false;
+            // Intercambiar con la persona de arriba
+            const temp = dayData.people[personIndex];
+            dayData.people[personIndex] = dayData.people[personIndex - 1];
+            dayData.people[personIndex - 1] = temp;
             
             initSchedule();
-            showStatus(`Persona "${movedPerson}" movida a posición ${getPositionName(position)}`);
             
-            personForPositionMove = null;
-            targetDayForPosition = null;
-        }
-
-        function getPositionName(position) {
-            switch(position) {
-                case 0: return 'arriba del todo';
-                case 1: return 'en el medio';
-                case 2: return 'abajo del todo';
-                default: return 'posición especificada';
-            }
-        }
-
-        // SISTEMA TÁCTIL MEJORADO PARA PERSONAS
-        function initializeTouchSystem() {
-            document.addEventListener('touchstart', handleTouchStart, { passive: false });
-            document.addEventListener('touchmove', handleTouchMove, { passive: false });
-            document.addEventListener('touchend', handleTouchEnd);
-            document.addEventListener('touchcancel', handleTouchEnd);
-        }
-
-        function handleTouchStart(e) {
-            if (!isLoggedIn || dayMoveMode) return;
-            
-            const touch = e.touches[0];
-            const target = document.elementFromPoint(touch.clientX, touch.clientY);
-            
-            if (target && target.classList.contains('person-item')) {
-                e.preventDefault();
-                startTouch = {
-                    x: touch.clientX,
-                    y: touch.clientY,
-                    target: target,
-                    time: Date.now()
-                };
-            }
-        }
-
-        function handleTouchMove(e) {
-            if (!startTouch || dayMoveMode) return;
-            
-            const touch = e.touches[0];
-            const deltaX = Math.abs(touch.clientX - startTouch.x);
-            const deltaY = Math.abs(touch.clientY - startTouch.y);
-            
-            if ((deltaX > 10 || deltaY > 10) && !touchDragging) {
-                startDrag(startTouch.target, touch);
-                touchDragging = true;
-            }
-            
-            if (touchDragging && draggedPersonElement) {
-                e.preventDefault();
-                updateDragPosition(touch);
-                updateDropTargets(touch);
-            }
-        }
-
-        function handleTouchEnd(e) {
-            if (touchDragging) {
-                const touch = e.changedTouches[0];
-                completeDrag(touch);
-            } else if (startTouch) {
-                const duration = Date.now() - startTouch.time;
-                if (duration < 500) {
-                    showPersonOptions(startTouch.target, e.changedTouches[0]);
+            // Reseleccionar la persona en su nueva posición
+            setTimeout(() => {
+                const newPersonElement = document.querySelector(`.calendar-day[data-group="${groupIdx}"][data-day="${dayIdx}"] .person-item[data-index="${personIndex - 1}"]`);
+                if (newPersonElement) {
+                    selectPerson(newPersonElement);
                 }
-            }
-            resetDrag();
+            }, 100);
+            
+            showStatus(`Persona movida hacia arriba`);
         }
 
-        function showPersonOptions(personElement, touch) {
-            const groupIdx = parseInt(personElement.closest('.calendar-day').dataset.group);
-            const dayIdx = parseInt(personElement.closest('.calendar-day').dataset.day);
-            const personIndex = Array.from(personElement.parentNode.children).indexOf(personElement);
+        function movePersonDown() {
+            if (!selectedPerson) {
+                showStatus('Primero seleccione una persona', 'error');
+                return;
+            }
             
-            const menu = document.createElement('div');
-            menu.className = 'mobile-menu';
-            menu.style.left = Math.min(touch.clientX, window.innerWidth - 200) + 'px';
-            menu.style.top = Math.min(touch.clientY, window.innerHeight - 250) + 'px';
+            const groupIdx = parseInt(selectedPerson.dataset.group);
+            const dayIdx = parseInt(selectedPerson.dataset.day);
+            const personIndex = parseInt(selectedPerson.dataset.index);
             
-            menu.innerHTML = `
-                <div style="margin-bottom: 8px; font-weight: bold; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                    ${personElement.textContent}
-                </div>
-                <button class="mobile-menu-btn" data-action="moveWithPosition">🎯 Mover con posición</button>
-                <button class="mobile-menu-btn" data-action="removePerson">🗑️ Eliminar</button>
-                <button class="mobile-menu-btn cancel" data-action="cancel">❌ Cancelar</button>
-            `;
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
             
-            document.body.appendChild(menu);
+            if (personIndex === dayData.people.length - 1) {
+                showStatus('La persona ya está en la última posición', 'error');
+                return;
+            }
             
-            menu.querySelectorAll('.mobile-menu-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const action = this.dataset.action;
-                    
-                    switch(action) {
-                        case 'moveWithPosition':
-                            startPositionMove(personElement);
-                            break;
-                        case 'removePerson':
-                            removeSpecificPerson(groupIdx, dayIdx, personIndex);
-                            break;
-                    }
-                    
-                    document.body.removeChild(menu);
+            // Intercambiar con la persona de abajo
+            const temp = dayData.people[personIndex];
+            dayData.people[personIndex] = dayData.people[personIndex + 1];
+            dayData.people[personIndex + 1] = temp;
+            
+            initSchedule();
+            
+            // Reseleccionar la persona en su nueva posición
+            setTimeout(() => {
+                const newPersonElement = document.querySelector(`.calendar-day[data-group="${groupIdx}"][data-day="${dayIdx}"] .person-item[data-index="${personIndex + 1}"]`);
+                if (newPersonElement) {
+                    selectPerson(newPersonElement);
+                }
+            }, 100);
+            
+            showStatus(`Persona movida hacia abajo`);
+        }
+
+        // DRAG & DROP PARA DESKTOP
+        function initializeDesktopDragDrop() {
+            if (isMobileDevice) return;
+            
+            let draggedElement = null;
+            
+            document.addEventListener('dragstart', function(e) {
+                if (!isLoggedIn) return;
+                
+                if (e.target.classList.contains('person-item')) {
+                    draggedElement = e.target;
+                    e.target.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', '');
+                }
+            });
+            
+            document.addEventListener('dragend', function(e) {
+                if (draggedElement) {
+                    draggedElement.classList.remove('dragging');
+                    draggedElement = null;
+                }
+                document.querySelectorAll('.calendar-day.drag-over').forEach(day => {
+                    day.classList.remove('drag-over');
                 });
             });
             
-            setTimeout(() => {
-                const closeMenu = (e) => {
-                    if (!menu.contains(e.target)) {
-                        document.body.removeChild(menu);
-                        document.removeEventListener('touchstart', closeMenu);
+            document.addEventListener('dragover', function(e) {
+                if (!isLoggedIn || !draggedElement) return;
+                e.preventDefault();
+                
+                const dayElement = e.target.closest('.calendar-day');
+                if (dayElement && !dayElement.classList.contains('hidden') && !dayElement.classList.contains('empty')) {
+                    const targetGroupIdx = parseInt(dayElement.dataset.group);
+                    const targetDayIdx = parseInt(dayElement.dataset.day);
+                    const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
+                    
+                    if (targetDay.people.length < 4) {
+                        e.dataTransfer.dropEffect = 'move';
+                        dayElement.classList.add('drag-over');
                     }
-                };
-                document.addEventListener('touchstart', closeMenu);
-            }, 100);
-        }
-
-        function removeSpecificPerson(groupIdx, dayIdx, personIndex) {
-            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
-            const removedPerson = dayData.people.splice(personIndex, 1)[0];
-            dayData.isEmpty = dayData.people.length === 0;
-            
-            initSchedule();
-            showStatus(`Persona "${removedPerson}" eliminada`);
-        }
-
-        // Funciones de drag & drop básicas
-        function startDrag(personElement, touch) {
-            draggedPersonElement = personElement;
-            const groupIdx = parseInt(personElement.closest('.calendar-day').dataset.group);
-            const dayIdx = parseInt(personElement.closest('.calendar-day').dataset.day);
-            const personIndex = Array.from(personElement.parentNode.children).indexOf(personElement);
-            
-            draggedPerson = {
-                sourceGroup: groupIdx,
-                sourceDay: dayIdx,
-                personIndex: personIndex,
-                personName: personElement.textContent
-            };
-            
-            dragGhost = document.createElement('div');
-            dragGhost.className = 'drag-ghost';
-            dragGhost.textContent = personElement.textContent;
-            dragGhost.style.left = touch.clientX + 'px';
-            dragGhost.style.top = touch.clientY + 'px';
-            document.body.appendChild(dragGhost);
-            
-            personElement.classList.add('touch-dragging');
-            
-            showStatus(`Arrastrando: ${personElement.textContent}. Suelte en el día destino`);
-        }
-
-        function updateDragPosition(touch) {
-            if (dragGhost) {
-                dragGhost.style.left = touch.clientX + 'px';
-                dragGhost.style.top = touch.clientY + 'px';
-            }
-        }
-
-        function updateDropTargets(touch) {
-            document.querySelectorAll('.calendar-day.drop-target').forEach(day => {
-                day.classList.remove('drop-target');
+                }
             });
             
-            const element = document.elementFromPoint(touch.clientX, touch.clientY);
-            const dayElement = element ? element.closest('.calendar-day') : null;
-            
-            if (dayElement && !dayElement.classList.contains('hidden') && !dayElement.classList.contains('empty')) {
-                const targetGroupIdx = parseInt(dayElement.dataset.group);
-                const targetDayIdx = parseInt(dayElement.dataset.day);
-                const targetDay = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
-                
-                if (!(draggedPerson.sourceGroup === targetGroupIdx && draggedPerson.sourceDay === targetDayIdx) &&
-                    targetDay.people.length < 4) {
-                    dayElement.classList.add('drop-target');
+            document.addEventListener('dragleave', function(e) {
+                const dayElement = e.target.closest('.calendar-day');
+                if (dayElement) {
+                    dayElement.classList.remove('drag-over');
                 }
-            }
-        }
-
-        function completeDrag(touch) {
-            const element = document.elementFromPoint(touch.clientX, touch.clientY);
-            const dayElement = element ? element.closest('.calendar-day') : null;
+            });
             
-            if (dayElement && dayElement.classList.contains('drop-target')) {
-                const targetGroupIdx = parseInt(dayElement.dataset.group);
-                const targetDayIdx = parseInt(dayElement.dataset.day);
+            document.addEventListener('drop', function(e) {
+                e.preventDefault();
+                if (!isLoggedIn || !draggedElement) return;
                 
-                movePersonToDay(
-                    draggedPerson.sourceGroup, 
-                    draggedPerson.sourceDay, 
-                    draggedPerson.personIndex,
-                    targetGroupIdx, 
-                    targetDayIdx
-                );
-            }
-            
-            if (dragGhost) {
-                document.body.removeChild(dragGhost);
-                dragGhost = null;
-            }
+                const dayElement = e.target.closest('.calendar-day');
+                if (dayElement && dayElement.classList.contains('drag-over')) {
+                    const sourceGroupIdx = parseInt(draggedElement.dataset.group);
+                    const sourceDayIdx = parseInt(draggedElement.dataset.day);
+                    const personIndex = parseInt(draggedElement.dataset.index);
+                    const targetGroupIdx = parseInt(dayElement.dataset.group);
+                    const targetDayIdx = parseInt(dayElement.dataset.day);
+                    
+                    movePersonToDay(sourceGroupIdx, sourceDayIdx, personIndex, targetGroupIdx, targetDayIdx);
+                }
+                
+                document.querySelectorAll('.calendar-day.drag-over').forEach(day => {
+                    day.classList.remove('drag-over');
+                });
+            });
         }
 
         function movePersonToDay(sourceGroupIdx, sourceDayIdx, personIndex, targetGroupIdx, targetDayIdx) {
@@ -1755,214 +1561,7 @@
             showStatus(`Persona "${movedPerson}" movida correctamente`);
         }
 
-        function resetDrag() {
-            if (draggedPersonElement) {
-                draggedPersonElement.classList.remove('touch-dragging');
-                draggedPersonElement = null;
-            }
-            
-            document.querySelectorAll('.calendar-day.drop-target').forEach(day => {
-                day.classList.remove('drop-target');
-            });
-            
-            if (dragGhost) {
-                document.body.removeChild(dragGhost);
-                dragGhost = null;
-            }
-            
-            touchDragging = false;
-            startTouch = null;
-            draggedPerson = null;
-        }
-
-        // SISTEMA DE MOVIMIENTO DE DÍAS COMPLETOS
-        function initializeDayTouchSystem() {
-            document.addEventListener('touchstart', function(e) {
-                if (!isLoggedIn || touchDragging) return;
-                
-                const touch = e.touches[0];
-                const target = document.elementFromPoint(touch.clientX, touch.clientY);
-                const dayElement = target ? target.closest('.calendar-day') : null;
-                
-                if (dayElement && !dayElement.classList.contains('hidden') && !dayElement.classList.contains('empty')) {
-                    const groupIdx = parseInt(dayElement.dataset.group);
-                    const dayIdx = parseInt(dayElement.dataset.day);
-                    
-                    startTouch = {
-                        element: dayElement,
-                        x: touch.clientX,
-                        y: touch.clientY,
-                        time: Date.now(),
-                        groupIdx: groupIdx,
-                        dayIdx: dayIdx
-                    };
-                }
-            }, { passive: true });
-            
-            document.addEventListener('touchend', function(e) {
-                if (!startTouch || touchDragging) return;
-                
-                const touch = e.changedTouches[0];
-                const duration = Date.now() - startTouch.time;
-                const distance = Math.sqrt(
-                    Math.pow(touch.clientX - startTouch.x, 2) + 
-                    Math.pow(touch.clientY - startTouch.y, 2)
-                );
-                
-                if (duration > 800 && distance < 20) {
-                    showDayOptions(startTouch.element, touch);
-                }
-                
-                startTouch = null;
-            }, { passive: true });
-        }
-
-        function showDayOptions(dayElement, touch) {
-            const groupIdx = parseInt(dayElement.dataset.group);
-            const dayIdx = parseInt(dayElement.dataset.day);
-            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
-            
-            const menu = document.createElement('div');
-            menu.className = 'mobile-menu';
-            menu.style.left = Math.min(touch.clientX, window.innerWidth - 200) + 'px';
-            menu.style.top = Math.min(touch.clientY, window.innerHeight - 250) + 'px';
-            
-            menu.innerHTML = `
-                <div style="margin-bottom: 8px; font-weight: bold; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                    ${dayData.day.split(' ')[0]}
-                </div>
-                <button class="mobile-menu-btn" data-action="add">➕ Agregar persona</button>
-                <button class="mobile-menu-btn" data-action="remove">➖ Quitar persona</button>
-                <button class="mobile-menu-btn" data-action="toggle">${dayData.hidden ? '👁️ Mostrar' : '👁️ Ocultar'} día</button>
-                <button class="mobile-menu-btn" data-action="moveDay">🔄 Mover día completo</button>
-                <button class="mobile-menu-btn cancel" data-action="cancel">❌ Cancelar</button>
-            `;
-            
-            document.body.appendChild(menu);
-            
-            menu.querySelectorAll('.mobile-menu-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const action = this.dataset.action;
-                    
-                    switch(action) {
-                        case 'add':
-                            addPerson(groupIdx, dayIdx);
-                            break;
-                        case 'remove':
-                            removePerson(groupIdx, dayIdx);
-                            break;
-                        case 'toggle':
-                            toggleDayVisibility(groupIdx, dayIdx);
-                            break;
-                        case 'moveDay':
-                            startDayMove(groupIdx, dayIdx);
-                            break;
-                    }
-                    
-                    document.body.removeChild(menu);
-                });
-            });
-            
-            setTimeout(() => {
-                const closeMenu = (e) => {
-                    if (!menu.contains(e.target)) {
-                        document.body.removeChild(menu);
-                        document.removeEventListener('touchstart', closeMenu);
-                    }
-                };
-                document.addEventListener('touchstart', closeMenu);
-            }, 100);
-        }
-
-        function startDayMove(sourceGroupIdx, sourceDayIdx) {
-            dayMoveMode = true;
-            sourceDayForMove = { groupIdx: sourceGroupIdx, dayIdx: sourceDayIdx };
-            
-            const sourceElement = document.querySelector(`.calendar-day[data-group="${sourceGroupIdx}"][data-day="${sourceDayIdx}"]`);
-            if (sourceElement) {
-                sourceElement.classList.add('day-move-source');
-            }
-            
-            document.querySelectorAll('.calendar-day').forEach(day => {
-                const targetGroupIdx = parseInt(day.dataset.group);
-                const targetDayIdx = parseInt(day.dataset.day);
-                
-                if (!(sourceGroupIdx === targetGroupIdx && sourceDayIdx === targetDayIdx) &&
-                    !day.classList.contains('hidden') && !day.classList.contains('empty')) {
-                    day.classList.add('day-move-target');
-                    day.addEventListener('click', handleDayMoveSelection);
-                }
-            });
-            
-            showStatus('Seleccione el día destino para intercambiar');
-        }
-
-        function handleDayMoveSelection(e) {
-            if (!dayMoveMode || !sourceDayForMove) return;
-            
-            const targetElement = e.currentTarget;
-            const targetGroupIdx = parseInt(targetElement.dataset.group);
-            const targetDayIdx = parseInt(targetElement.dataset.day);
-            
-            swapDays(
-                sourceDayForMove.groupIdx, 
-                sourceDayForMove.dayIdx, 
-                targetGroupIdx, 
-                targetDayIdx
-            );
-            
-            cleanupDayMoveMode();
-        }
-
-        function swapDays(sourceGroupIdx, sourceDayIdx, targetGroupIdx, targetDayIdx) {
-            const sourceData = scheduleData.groups[sourceGroupIdx].days[sourceDayIdx];
-            const targetData = scheduleData.groups[targetGroupIdx].days[targetDayIdx];
-            
-            const sourceOriginalDate = new Date(sourceData.originalDate);
-            const targetOriginalDate = new Date(targetData.originalDate);
-            
-            const tempPeople = [...sourceData.people];
-            const tempIsEmpty = sourceData.isEmpty;
-            const tempHidden = sourceData.hidden;
-            
-            sourceData.people = [...targetData.people];
-            sourceData.isEmpty = targetData.isEmpty;
-            sourceData.hidden = targetData.hidden;
-            
-            targetData.people = tempPeople;
-            targetData.isEmpty = tempIsEmpty;
-            targetData.hidden = tempHidden;
-            
-            updateDayHeader(sourceData, sourceOriginalDate);
-            updateDayHeader(targetData, targetOriginalDate);
-            
-            initSchedule();
-            showStatus('Días intercambiados correctamente');
-        }
-
-        function cleanupDayMoveMode() {
-            document.querySelectorAll('.calendar-day').forEach(day => {
-                day.classList.remove('day-move-source', 'day-move-target');
-                day.removeEventListener('click', handleDayMoveSelection);
-            });
-            
-            dayMoveMode = false;
-            sourceDayForMove = null;
-        }
-
-        function updateDayHeader(dayData, date) {
-            const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-            const dayName = dayNames[date.getDay()];
-            const dayNumber = date.getDate();
-            const month = date.getMonth() + 1;
-            const year = date.getFullYear();
-            
-            dayData.day = `${dayName} ${dayNumber}/${month}/${year}`;
-            dayData.date = new Date(date);
-            dayData.originalDate = new Date(date);
-        }
-
-        // Inicializar el cronograma con botones de posición
+        // Inicializar el cronograma
         function initSchedule() {
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
@@ -2003,7 +1602,7 @@
                     const content = document.createElement('div');
                     content.className = 'day-content';
                     
-                    // Controles de posición (botones ⬆️⬇️)
+                    // Controles de posición (solo en móviles o cuando hay persona seleccionada)
                     if (isLoggedIn && !dayData.hidden && !dayData.isEmpty) {
                         const positionControls = document.createElement('div');
                         positionControls.className = 'position-controls';
@@ -2011,24 +1610,29 @@
                         const upBtn = document.createElement('button');
                         upBtn.className = 'position-btn up';
                         upBtn.innerHTML = '⬆️';
-                        upBtn.title = 'Mover persona con posición específica';
+                        upBtn.title = 'Mover persona hacia arriba';
                         upBtn.onclick = (e) => {
                             e.stopPropagation();
-                            showPositionMoveMenu(dayDiv);
+                            movePersonUp();
                         };
                         positionControls.appendChild(upBtn);
                         
                         const downBtn = document.createElement('button');
                         downBtn.className = 'position-btn down';
                         downBtn.innerHTML = '⬇️';
-                        downBtn.title = 'Mover persona con posición específica';
+                        downBtn.title = 'Mover persona hacia abajo';
                         downBtn.onclick = (e) => {
                             e.stopPropagation();
-                            showPositionMoveMenu(dayDiv);
+                            movePersonDown();
                         };
                         positionControls.appendChild(downBtn);
                         
                         dayDiv.appendChild(positionControls);
+                        
+                        // En móviles, las flechas siempre visibles
+                        if (isMobileDevice) {
+                            dayDiv.classList.add('show-position-controls');
+                        }
                     }
 
                     if (dayData.hidden) {
@@ -2129,6 +1733,7 @@
             });
 
             applyFontStyles();
+            initializeDesktopDragDrop();
         }
 
         function createPersonElement(person, groupIdx, dayIdx, index) {
@@ -2140,90 +1745,28 @@
             personDiv.dataset.index = index;
             
             if (isLoggedIn) {
-                // Doble click para mover con posición
-                let clickTimer = null;
-                personDiv.addEventListener('click', function(e) {
-                    if (clickTimer === null) {
-                        clickTimer = setTimeout(() => {
-                            clickTimer = null;
-                        }, 300);
-                    } else {
-                        clearTimeout(clickTimer);
-                        clickTimer = null;
-                        startPositionMove(this);
-                    }
-                });
+                if (isMobileDevice) {
+                    // En móviles: click para seleccionar
+                    personDiv.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        selectPerson(this);
+                    });
+                } else {
+                    // En desktop: drag & drop
+                    personDiv.draggable = true;
+                    
+                    // Click para seleccionar y mostrar flechas
+                    personDiv.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        selectPerson(this);
+                    });
+                }
             }
             
             return personDiv;
         }
 
-        function showPositionMoveMenu(dayElement) {
-            const groupIdx = parseInt(dayElement.dataset.group);
-            const dayIdx = parseInt(dayElement.dataset.day);
-            
-            targetDayForPosition = { groupIdx: groupIdx, dayIdx: dayIdx };
-            showStatus('Seleccione la persona a mover');
-            
-            // Resaltar personas en el día actual
-            dayElement.querySelectorAll('.person-item').forEach(person => {
-                person.style.background = '#e3f2fd';
-                person.style.border = '2px solid #00b4db';
-                person.addEventListener('click', handlePersonSelectionForPosition);
-            });
-        }
-
-        function handlePersonSelectionForPosition(e) {
-            e.stopPropagation();
-            const personElement = e.currentTarget;
-            const groupIdx = parseInt(personElement.dataset.group);
-            const dayIdx = parseInt(personElement.dataset.day);
-            const personIndex = parseInt(personElement.dataset.index);
-            
-            personForPositionMove = {
-                sourceGroup: groupIdx,
-                sourceDay: dayIdx,
-                personIndex: personIndex,
-                personName: personElement.textContent
-            };
-            
-            // Limpiar estilos
-            document.querySelectorAll('.person-item').forEach(p => {
-                p.style.background = '';
-                p.style.border = '';
-                p.removeEventListener('click', handlePersonSelectionForPosition);
-            });
-            
-            showPositionModal();
-        }
-
-        // Event listeners para el modal de posición
-        document.getElementById('confirmPositionBtn').addEventListener('click', function() {
-            if (personForPositionMove && targetDayForPosition) {
-                movePersonWithPosition(
-                    targetDayForPosition.groupIdx,
-                    targetDayForPosition.dayIdx,
-                    selectedPosition
-                );
-            }
-            hidePositionModal();
-        });
-
-        document.getElementById('cancelPositionBtn').addEventListener('click', function() {
-            hidePositionModal();
-            personForPositionMove = null;
-            targetDayForPosition = null;
-        });
-
-        document.querySelectorAll('.position-option').forEach(option => {
-            option.addEventListener('click', function() {
-                document.querySelectorAll('.position-option').forEach(opt => {
-                    opt.classList.remove('selected');
-                });
-                this.classList.add('selected');
-                selectedPosition = parseInt(this.dataset.position);
-            });
-        });
+        // ... (el resto del código de eventos y funciones se mantiene igual)
 
         // Sistema de login
         document.getElementById('loginSubmit').addEventListener('click', () => {
@@ -2549,10 +2092,6 @@
             });
         });
 
-        // Inicializar sistemas táctiles
-        initializeTouchSystem();
-        initializeDayTouchSystem();
-        
         // Inicializar aplicación
         loadExcelAutomatically();
     </script>
