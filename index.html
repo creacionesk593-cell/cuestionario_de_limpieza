@@ -749,6 +749,13 @@
             transform: scale(1.02);
         }
 
+        .calendar-day.touch-dragging {
+            opacity: 0.7;
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
         .mobile-menu {
             position: fixed;
             background: white;
@@ -796,6 +803,14 @@
             pointer-events: none;
             opacity: 0.8;
             transform: translate(-50%, -50%);
+            max-width: 200px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .drag-ghost.day-drag {
+            background: #ffd166 !important;
+            border: 2px dashed #ff9e00 !important;
         }
 
         /* Indicadores de desplazamiento */
@@ -1073,6 +1088,14 @@
         let isTouchDragging = false;
         let scrollInterval = null;
         let autoScrollSpeed = 10;
+
+        // Variables para el drag & drop de días completos en móviles
+        let dayTouchDragState = {
+            isDragging: false,
+            draggedDay: null,
+            sourceGroupIdx: null,
+            sourceDayIdx: null
+        };
 
         // Función para verificar si un día tiene solo nombres "Vacio"
         function hasOnlyVacioNames(dayData) {
@@ -2069,23 +2092,17 @@
             document.getElementById('scrollBottomIndicator').classList.remove('active');
         }
 
-        // NUEVA FUNCIÓN: Sistema de drag & drop para dispositivos táctiles
+        // NUEVA FUNCIÓN: Sistema de drag & drop para personas en dispositivos táctiles
         function initializeTouchDragDrop() {
             document.querySelectorAll('.person-item').forEach(personElement => {
-                personElement.addEventListener('touchstart', handleTouchStart);
-                personElement.addEventListener('touchmove', handleTouchMove);
-                personElement.addEventListener('touchend', handleTouchEnd);
-                personElement.addEventListener('touchcancel', handleTouchEnd);
-            });
-
-            document.querySelectorAll('.calendar-day').forEach(dayElement => {
-                dayElement.addEventListener('touchmove', handleDayTouchMove);
-                dayElement.addEventListener('touchend', handleDayTouchEnd);
-                dayElement.addEventListener('touchcancel', handleDayTouchEnd);
+                personElement.addEventListener('touchstart', handlePersonTouchStart);
+                personElement.addEventListener('touchmove', handlePersonTouchMove);
+                personElement.addEventListener('touchend', handlePersonTouchEnd);
+                personElement.addEventListener('touchcancel', handlePersonTouchEnd);
             });
         }
 
-        function handleTouchStart(e) {
+        function handlePersonTouchStart(e) {
             if (!isLoggedIn) return;
             
             touchStartTime = Date.now();
@@ -2119,7 +2136,7 @@
             }, 1000);
         }
 
-        function handleTouchMove(e) {
+        function handlePersonTouchMove(e) {
             if (!isTouchDragging || !touchStartElement) return;
             
             e.preventDefault();
@@ -2153,7 +2170,7 @@
                 }
             }
             
-            // NUEVO: Sistema de desplazamiento automático
+            // Sistema de desplazamiento automático
             const scrollThreshold = 100; // Distancia desde los bordes para activar desplazamiento
             const viewportHeight = window.innerHeight;
             
@@ -2173,7 +2190,7 @@
             }
         }
 
-        function handleTouchEnd(e) {
+        function handlePersonTouchEnd(e) {
             clearTimeout(touchDragTimeout);
             stopAutoScroll();
             
@@ -2183,7 +2200,7 @@
                     selectPerson(touchStartElement);
                 }
                 
-                resetTouchState();
+                resetPersonTouchState();
                 return;
             }
             
@@ -2213,22 +2230,11 @@
                 }
             }
             
-            resetTouchState();
+            resetPersonTouchState();
         }
 
-        function handleDayTouchMove(e) {
-            if (!isTouchDragging) return;
-            e.preventDefault();
-        }
-
-        function handleDayTouchEnd(e) {
-            // Solo procesar si estamos arrastrando
-            if (!isTouchDragging) return;
-            e.preventDefault();
-        }
-
-        function resetTouchState() {
-            // Limpiar estado de arrastre táctil
+        function resetPersonTouchState() {
+            // Limpiar estado de arrastre táctil de personas
             isTouchDragging = false;
             touchStartElement = null;
             
@@ -2238,6 +2244,181 @@
             
             // Limpiar clases
             document.querySelectorAll('.person-item.touch-dragging').forEach(el => {
+                el.classList.remove('touch-dragging');
+            });
+            document.querySelectorAll('.calendar-day.day-move-source').forEach(el => {
+                el.classList.remove('day-move-source');
+            });
+            document.querySelectorAll('.calendar-day.day-move-target').forEach(el => {
+                el.classList.remove('day-move-target');
+            });
+        }
+
+        // NUEVA FUNCIÓN: Sistema de drag & drop para días completos en dispositivos táctiles
+        function initializeDayTouchDragDrop() {
+            document.querySelectorAll('.calendar-day').forEach(dayElement => {
+                const groupIdx = parseInt(dayElement.dataset.group);
+                const dayIdx = parseInt(dayElement.dataset.day);
+                const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+                
+                // Solo permitir arrastrar días que no estén vacíos u ocultos
+                if (!dayData.hidden && !dayData.isEmpty) {
+                    dayElement.addEventListener('touchstart', handleDayTouchStart);
+                    dayElement.addEventListener('touchmove', handleDayTouchMove);
+                    dayElement.addEventListener('touchend', handleDayTouchEnd);
+                    dayElement.addEventListener('touchcancel', handleDayTouchEnd);
+                }
+            });
+        }
+
+        function handleDayTouchStart(e) {
+            if (!isLoggedIn) return;
+            
+            const dayElement = e.target.closest('.calendar-day');
+            if (!dayElement) return;
+            
+            const groupIdx = parseInt(dayElement.dataset.group);
+            const dayIdx = parseInt(dayElement.dataset.day);
+            const dayData = scheduleData.groups[groupIdx].days[dayIdx];
+            
+            // Solo permitir arrastrar días que no estén vacíos u ocultos
+            if (dayData.hidden || dayData.isEmpty) return;
+            
+            touchStartTime = Date.now();
+            
+            // Configurar timeout para iniciar arrastre después de 1 segundo
+            touchDragTimeout = setTimeout(() => {
+                dayTouchDragState.isDragging = true;
+                dayTouchDragState.draggedDay = dayElement;
+                dayTouchDragState.sourceGroupIdx = groupIdx;
+                dayTouchDragState.sourceDayIdx = dayIdx;
+                
+                dayElement.classList.add('touch-dragging');
+                
+                // Crear elemento fantasma para arrastre
+                const ghost = document.createElement('div');
+                ghost.className = 'drag-ghost day-drag';
+                ghost.textContent = `📅 ${dayData.day} (${dayData.people.length} personas)`;
+                document.body.appendChild(ghost);
+                
+                // Actualizar posición del fantasma
+                const touch = e.touches[0];
+                ghost.style.left = touch.clientX + 'px';
+                ghost.style.top = touch.clientY + 'px';
+                
+                // Marcar día origen
+                dayElement.classList.add('day-move-source');
+                
+                showStatus(`Arrastrando día completo: ${dayData.day}`);
+                
+            }, 1000);
+        }
+
+        function handleDayTouchMove(e) {
+            if (!dayTouchDragState.isDragging || !dayTouchDragState.draggedDay) return;
+            
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const ghost = document.querySelector('.drag-ghost');
+            
+            if (ghost) {
+                ghost.style.left = touch.clientX + 'px';
+                ghost.style.top = touch.clientY + 'px';
+            }
+            
+            // Verificar si estamos sobre un día destino
+            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+            const targetDay = elements.find(el => el.classList.contains('calendar-day'));
+            
+            // Limpiar clases de día destino
+            document.querySelectorAll('.calendar-day.day-move-target').forEach(day => {
+                day.classList.remove('day-move-target');
+            });
+            
+            if (targetDay && !targetDay.classList.contains('hidden')) {
+                const targetGroupIdx = parseInt(targetDay.dataset.group);
+                const targetDayIdx = parseInt(targetDay.dataset.day);
+                
+                // No permitir soltar en el mismo día
+                if (targetGroupIdx !== dayTouchDragState.sourceGroupIdx || 
+                    targetDayIdx !== dayTouchDragState.sourceDayIdx) {
+                    targetDay.classList.add('day-move-target');
+                }
+            }
+            
+            // Sistema de desplazamiento automático
+            const scrollThreshold = 100; // Distancia desde los bordes para activar desplazamiento
+            const viewportHeight = window.innerHeight;
+            
+            // Verificar si estamos cerca del borde inferior
+            if (touch.clientY > viewportHeight - scrollThreshold) {
+                document.getElementById('scrollBottomIndicator').classList.add('active');
+                startAutoScroll('down');
+            }
+            // Verificar si estamos cerca del borde superior
+            else if (touch.clientY < scrollThreshold) {
+                document.getElementById('scrollTopIndicator').classList.add('active');
+                startAutoScroll('up');
+            }
+            // Si no estamos cerca de los bordes, detener el desplazamiento
+            else {
+                stopAutoScroll();
+            }
+        }
+
+        function handleDayTouchEnd(e) {
+            clearTimeout(touchDragTimeout);
+            stopAutoScroll();
+            
+            if (!dayTouchDragState.isDragging) {
+                // Si no estábamos arrastrando, es un click normal
+                if (Date.now() - touchStartTime < 1000) {
+                    // Podrías agregar funcionalidad de click aquí si es necesario
+                }
+                
+                resetDayTouchState();
+                return;
+            }
+            
+            e.preventDefault();
+            
+            const touch = e.changedTouches[0];
+            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+            const targetDay = elements.find(el => el.classList.contains('calendar-day'));
+            
+            if (targetDay && !targetDay.classList.contains('hidden')) {
+                const targetGroupIdx = parseInt(targetDay.dataset.group);
+                const targetDayIdx = parseInt(targetDay.dataset.day);
+                
+                // No permitir soltar en el mismo día
+                if (targetGroupIdx !== dayTouchDragState.sourceGroupIdx || 
+                    targetDayIdx !== dayTouchDragState.sourceDayIdx) {
+                    
+                    // Intercambiar los días
+                    swapDays(
+                        dayTouchDragState.sourceGroupIdx, 
+                        dayTouchDragState.sourceDayIdx,
+                        targetGroupIdx,
+                        targetDayIdx
+                    );
+                }
+            }
+            
+            resetDayTouchState();
+        }
+
+        function resetDayTouchState() {
+            // Limpiar estado de arrastre táctil de días
+            dayTouchDragState.isDragging = false;
+            dayTouchDragState.draggedDay = null;
+            
+            // Remover elementos fantasma
+            const ghost = document.querySelector('.drag-ghost');
+            if (ghost) ghost.remove();
+            
+            // Limpiar clases
+            document.querySelectorAll('.calendar-day.touch-dragging').forEach(el => {
                 el.classList.remove('touch-dragging');
             });
             document.querySelectorAll('.calendar-day.day-move-source').forEach(el => {
@@ -2564,13 +2745,14 @@
             
             // Inicializar drag & drop según el dispositivo
             if (isMobileDevice) {
-                // En móviles usar sistema táctil
+                // En móviles usar sistema táctil para personas y días
                 setTimeout(() => {
-                    initializeTouchDragDrop();
+                    initializeTouchDragDrop(); // Para personas individuales
+                    initializeDayTouchDragDrop(); // Para días completos
                 }, 100);
             } else {
                 initializeDesktopDragDrop();
-                initializeDayDragDrop(); // Inicializar drag & drop de días
+                initializeDayDragDrop(); // Inicializar drag & drop de días (desktop)
                 setTimeout(() => {
                     initializePersonListDragDrop();
                 }, 100);
