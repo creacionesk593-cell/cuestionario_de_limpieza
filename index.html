@@ -838,6 +838,50 @@
             display: block;
         }
 
+        /* NUEVOS ESTILOS PARA EL PIE DE PÁGINA */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .footer-section {
+            flex: 1;
+            padding: 0 10px;
+        }
+        
+        .footer-section:not(:last-child) {
+            border-right: 1px solid #dee2e6;
+        }
+        
+        .footer-section h3 {
+            margin-bottom: 8px;
+            color: #00b4db;
+            font-size: 16px;
+        }
+        
+        .footer-section ul {
+            padding-left: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .footer-section p {
+            margin-bottom: 5px;
+        }
+        
+        .footer-section .verse {
+            font-style: italic;
+            margin-top: 5px;
+        }
+        
+        .download-mode .position-controls {
+            display: none !important;
+        }
+
         @media (max-width: 1200px) {
             .calendar-grid {
                 grid-template-columns: repeat(4, 1fr);
@@ -911,6 +955,17 @@
                 width: 20px;
                 height: 20px;
                 font-size: 12px;
+            }
+            
+            .footer {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .footer-section:not(:last-child) {
+                border-right: none;
+                border-bottom: 1px solid #dee2e6;
+                padding-bottom: 15px;
             }
         }
 
@@ -991,6 +1046,33 @@
         <div id="calendarGrid" class="calendar-grid">
             <div class="drag-info" id="dragInfo">
                 ⬆️ Buscando archivo Excel en la misma carpeta...
+            </div>
+        </div>
+        
+        <!-- NUEVO PIE DE PÁGINA -->
+        <div class="footer" id="pageFooter">
+            <div class="footer-section">
+                <h3>OBSERVACIONES</h3>
+                <div id="observacionesContent">
+                    <ul>
+                        <li>Por favor realizar la limpieza a la 1:PM para el culto de la Noche</li>
+                        <li>Y para el culto de la Mañana, realizarlo por la noche anterior</li>
+                        <li>La limpieza de las VIGILIAS lo realizarán Familia Gomez Morales</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>AUTORIZADO</h3>
+                <div id="autorizadoContent">
+                    <p>Ps. Juan Garcia Peralta</p>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>VERSÍCULO</h3>
+                <div id="versiculoContent">
+                    <p><strong>Mateo 7:21</strong></p>
+                    <p class="verse">No todo el que me dice: Señor, Señor, entrara en el reino de los cielos, sino el que hace la voluntad de mi Padre que está en los cielos.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1097,6 +1179,20 @@
             sourceDayIdx: null
         };
 
+        // Variables para el pie de página
+        let footerData = {
+            observaciones: [
+                "Por favor realizar la limpieza a la 1:PM para el culto de la Noche",
+                "Y para el culto de la Mañana, realizarlo por la noche anterior",
+                "La limpieza de las VIGILIAS lo realizarán Familia Gomez Morales"
+            ],
+            autorizado: "Ps. Juan Garcia Peralta",
+            versiculo: {
+                referencia: "Mateo 7:21",
+                texto: "No todo el que me dice: Señor, Señor, entrara en el reino de los cielos, sino el que hace la voluntad de mi Padre que está en los cielos."
+            }
+        };
+
         // Función para verificar si un día tiene solo nombres "Vacio"
         function hasOnlyVacioNames(dayData) {
             return dayData.people.length > 0 && 
@@ -1164,6 +1260,247 @@
             }
         }
 
+        // Función para procesar datos del pie de página desde Excel
+        function processFooterDataFromExcel(workbook) {
+            console.log("Iniciando procesamiento del pie de página desde Excel...");
+            
+            // Buscar específicamente la hoja "Cronograma"
+            const cronogramaSheetName = workbook.SheetNames.find(name => 
+                name.toLowerCase().includes('cronograma')
+            );
+
+            if (cronogramaSheetName) {
+                console.log("Hoja Cronograma encontrada:", cronogramaSheetName);
+                const sheet = workbook.Sheets[cronogramaSheetName];
+                const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                
+                console.log("Datos completos de la hoja Cronograma:", data);
+                
+                if (data.length > 0) {
+                    // Reiniciar datos del pie de página
+                    footerData.observaciones = [];
+                    footerData.autorizado = "";
+                    footerData.versiculo = {
+                        referencia: "",
+                        texto: ""
+                    };
+                    
+                    // Buscar índices de columnas en la primera fila (encabezados)
+                    const headerRow = data[0];
+                    let observacionesCol = -1;
+                    let versiculoCol = -1;
+                    let autorizadoCol = -1;
+                    
+                    console.log("Buscando columnas en encabezados:", headerRow);
+                    
+                    for (let i = 0; i < headerRow.length; i++) {
+                        const cell = headerRow[i] ? headerRow[i].toString().toLowerCase().trim() : '';
+                        console.log(`Columna ${i}: "${cell}"`);
+                        
+                        if (cell === 'observaciones') {
+                            observacionesCol = i;
+                            console.log("Columna OBSERVACIONES encontrada en índice:", i);
+                        } else if (cell === 'versiculo') {
+                            versiculoCol = i;
+                            console.log("Columna VERSICULO encontrada en índice:", i);
+                        } else if (cell === 'autoizado') {
+                            autorizadoCol = i;
+                            console.log("Columna AUTOIZADO encontrada en índice:", i);
+                        }
+                    }
+                    
+                    console.log("Índices encontrados - Observaciones:", observacionesCol, "Versículo:", versiculoCol, "Autoizado:", autorizadoCol);
+                    
+                    // Procesar datos de las filas
+                    for (let i = 1; i < data.length; i++) {
+                        const row = data[i];
+                        if (row && row.length > 0) {
+                            console.log(`Procesando fila ${i}:`, row);
+                            
+                            // Procesar observaciones
+                            if (observacionesCol !== -1 && row[observacionesCol] && row[observacionesCol].toString().trim() !== '') {
+                                const observacion = row[observacionesCol].toString().trim();
+                                if (!footerData.observaciones.includes(observacion)) {
+                                    footerData.observaciones.push(observacion);
+                                    console.log("Observación agregada:", observacion);
+                                }
+                            }
+                            
+                            // Procesar versículo
+                            if (versiculoCol !== -1 && row[versiculoCol] && row[versiculoCol].toString().trim() !== '') {
+                                const textoVersiculo = row[versiculoCol].toString().trim();
+                                if (!footerData.versiculo.referencia && textoVersiculo.toLowerCase().includes('mateo')) {
+                                    footerData.versiculo.referencia = textoVersiculo;
+                                    console.log("Referencia de versículo encontrada:", textoVersiculo);
+                                } else if (!footerData.versiculo.texto) {
+                                    footerData.versiculo.texto = textoVersiculo;
+                                    console.log("Texto de versículo encontrado:", textoVersiculo);
+                                }
+                            }
+                            
+                            // Procesar autorizado
+                            if (autorizadoCol !== -1 && row[autorizadoCol] && row[autorizadoCol].toString().trim() !== '') {
+                                if (!footerData.autorizado) {
+                                    footerData.autorizado = row[autorizadoCol].toString().trim();
+                                    console.log("Autorizado encontrado:", footerData.autorizado);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Si no se encontraron datos en las columnas, buscar en formato anterior
+                    if (footerData.observaciones.length === 0 && !footerData.autorizado && !footerData.versiculo.referencia) {
+                        console.log("No se encontraron datos en columnas, buscando en formato anterior...");
+                        buscarEnFormatoAnterior(data);
+                    }
+                    
+                } else {
+                    console.log("La hoja Cronograma está vacía");
+                }
+            } else {
+                console.log("No se encontró la hoja 'Cronograma'");
+            }
+            
+            console.log("Datos finales del pie de página:", footerData);
+            // Actualizar el pie de página con los datos procesados
+            updateFooter();
+        }
+
+        // Función para buscar en formato anterior (filas con títulos)
+        function buscarEnFormatoAnterior(data) {
+            console.log("Buscando en formato anterior...");
+            
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
+                if (row && row.length > 0) {
+                    const firstCell = row[0] ? row[0].toString().toLowerCase().trim() : '';
+                    
+                    if (firstCell === 'observaciones') {
+                        console.log("Encontrado OBSERVACIONES en formato anterior, fila:", i);
+                        
+                        // Procesar observaciones
+                        for (let j = 1; j < row.length; j++) {
+                            if (row[j] && row[j].toString().trim() !== '') {
+                                const observacion = row[j].toString().trim();
+                                footerData.observaciones.push(observacion);
+                                console.log("Observación agregada:", observacion);
+                            }
+                        }
+                    }
+                    else if (firstCell === 'autorizado') {
+                        console.log("Encontrado AUTORIZADO en formato anterior, fila:", i);
+                        
+                        // Buscar autorizado
+                        for (let j = 1; j < row.length; j++) {
+                            if (row[j] && row[j].toString().trim() !== '') {
+                                footerData.autorizado = row[j].toString().trim();
+                                console.log("Autorizado encontrado:", footerData.autorizado);
+                                break;
+                            }
+                        }
+                    }
+                    else if (firstCell === 'versiculo' || firstCell.includes('mateo')) {
+                        console.log("Encontrado VERSÍCULO en formato anterior, fila:", i);
+                        
+                        // Buscar versículo
+                        for (let j = 1; j < row.length; j++) {
+                            if (row[j] && row[j].toString().trim() !== '') {
+                                const texto = row[j].toString().trim();
+                                if (texto.toLowerCase().includes('mateo')) {
+                                    footerData.versiculo.referencia = texto;
+                                    console.log("Referencia de versículo encontrada:", texto);
+                                } else {
+                                    footerData.versiculo.texto = texto;
+                                    console.log("Texto de versículo encontrado:", texto);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Función para actualizar el pie de página
+        function updateFooter() {
+            const observacionesContent = document.getElementById('observacionesContent');
+            const autorizadoContent = document.getElementById('autorizadoContent');
+            const versiculoContent = document.getElementById('versiculoContent');
+            
+            // Actualizar observaciones
+            if (footerData.observaciones && footerData.observaciones.length > 0) {
+                let html = '<ul>';
+                footerData.observaciones.forEach(obs => {
+                    // Limpiar el texto y asegurarse de que sea válido
+                    const textoLimpio = obs.trim();
+                    if (textoLimpio && textoLimpio !== '') {
+                        html += `<li>${textoLimpio}</li>`;
+                    }
+                });
+                html += '</ul>';
+                
+                // Solo actualizar si hay observaciones válidas
+                const observacionesValidas = footerData.observaciones.filter(obs => obs.trim() !== '');
+                if (observacionesValidas.length > 0) {
+                    observacionesContent.innerHTML = html;
+                    console.log("Observaciones actualizadas en el pie de página:", observacionesValidas);
+                } else {
+                    observacionesContent.innerHTML = `
+                        <ul>
+                            <li>Por favor realizar la limpieza a la 1:PM para el culto de la Noche</li>
+                            <li>Y para el culto de la Mañana, realizarlo por la noche anterior</li>
+                            <li>La limpieza de las VIGILIAS lo realizarán Familia Gomez Morales</li>
+                        </ul>
+                    `;
+                    console.log("Usando observaciones por defecto - no se encontraron válidas");
+                }
+            } else {
+                // Datos por defecto si no se encuentran en el Excel
+                observacionesContent.innerHTML = `
+                    <ul>
+                        <li>Por favor realizar la limpieza a la 1:PM para el culto de la Noche</li>
+                        <li>Y para el culto de la Mañana, realizarlo por la noche anterior</li>
+                        <li>La limpieza de las VIGILIAS lo realizarán Familia Gomez Morales</li>
+                    </ul>
+                `;
+                console.log("Usando observaciones por defecto");
+            }
+            
+            // Actualizar autorizado
+            if (footerData.autorizado && footerData.autorizado.trim() !== '') {
+                autorizadoContent.innerHTML = `<p>${footerData.autorizado}</p>`;
+                console.log("Autorizado actualizado en el pie de página:", footerData.autorizado);
+            } else {
+                // Dato por defecto
+                autorizadoContent.innerHTML = `<p>Ps. Juan Garcia Peralta</p>`;
+                console.log("Usando autorizado por defecto");
+            }
+            
+            // Actualizar versículo
+            if (footerData.versiculo && footerData.versiculo.referencia && footerData.versiculo.referencia.trim() !== '') {
+                versiculoContent.innerHTML = `
+                    <p><strong>${footerData.versiculo.referencia}</strong></p>
+                    ${footerData.versiculo.texto ? `<p class="verse">${footerData.versiculo.texto}</p>` : ''}
+                `;
+                console.log("Versículo actualizado en el pie de página:", footerData.versiculo);
+            } else {
+                // Datos por defecto
+                versiculoContent.innerHTML = `
+                    <p><strong>Mateo 7:21</strong></p>
+                    <p class="verse">No todo el que me dice: Señor, Señor, entrara en el reino de los cielos, sino el que hace la voluntad de mi Padre que está en los cielos.</p>
+                `;
+                console.log("Usando versículo por defecto");
+            }
+            
+            // Mostrar mensaje de estado
+            const tieneDatosNuevos = footerData.observaciones.some(obs => obs.trim() !== '') || 
+                                    (footerData.autorizado && footerData.autorizado.trim() !== '') || 
+                                    (footerData.versiculo.referencia && footerData.versiculo.referencia.trim() !== '');
+            
+            if (tieneDatosNuevos) {
+                showStatus('Pie de página cargado correctamente desde el Excel');
+            }
+        }
+
         // Cargar Excel automáticamente
         async function loadExcelAutomatically() {
             try {
@@ -1187,6 +1524,7 @@
                         });
                         
                         processUsersFromExcel(workbook);
+                        processFooterDataFromExcel(workbook);
                         processExcelData(workbook);
                         showStatus('Base de datos cargada correctamente desde ' + EXCEL_FILENAME);
                         return;
@@ -1211,6 +1549,7 @@
                         });
                         
                         processUsersFromExcel(workbook);
+                        processFooterDataFromExcel(workbook);
                         processExcelData(workbook);
                         showStatus('Base de datos cargada correctamente desde GitHub');
                         return;
@@ -1248,6 +1587,7 @@
                         });
                         
                         processUsersFromExcel(workbook);
+                        processFooterDataFromExcel(workbook);
                         processExcelData(workbook);
                         showStatus('Archivo Excel cargado correctamente');
                         document.getElementById('fileUploadSection').style.display = 'none';
