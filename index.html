@@ -97,7 +97,7 @@
 
         .calendar-grid {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(7, 1fr);
             gap: 10px;
             padding: 30px;
             background: #f8f9fa;
@@ -1049,10 +1049,10 @@
         
         let scheduleData = {
             groups: [
-                { name: 'Supervisoras grupo #1', color: '#ff6b9d', days: [] },
-                { name: 'Supervisoras grupo #2', color: '#4ecdc4', days: [] },
-                { name: 'Supervisoras grupo #3', color: '#95e1d3', days: [] },
-                { name: 'Supervisoras grupo #4', color: '#ffd166', days: [] }
+                { name: 'Supervisor grupo #1', color: '#ff6b9d', days: [] },
+                { name: 'Supervisor grupo #2', color: '#4ecdc4', days: [] },
+                { name: 'Supervisor grupo #3', color: '#95e1d3', days: [] },
+                { name: 'Supervisor grupo #4', color: '#ffd166', days: [] }
             ],
             startDate: null
         };
@@ -1305,10 +1305,10 @@
                 });
             }
             
-            scheduleData.groups[0].name = `Supervisoras grupo #1 ${supervisorNames['1'] || ''}`;
-            scheduleData.groups[1].name = `Supervisoras grupo #2 ${supervisorNames['2'] || ''}`;
-            scheduleData.groups[2].name = `Supervisoras grupo #3 ${supervisorNames['3'] || ''}`;
-            scheduleData.groups[3].name = `Supervisoras grupo #4 ${supervisorNames['4'] || ''}`;
+            scheduleData.groups[0].name = `Supervisor grupo #1 ${supervisorNames['1'] || ''}`;
+            scheduleData.groups[1].name = `Supervisor grupo #2 ${supervisorNames['2'] || ''}`;
+            scheduleData.groups[2].name = `Supervisor grupo #3 ${supervisorNames['3'] || ''}`;
+            scheduleData.groups[3].name = `Supervisor grupo #4 ${supervisorNames['4'] || ''}`;
         }
 
         // Procesar datos del Excel
@@ -1329,6 +1329,7 @@
                     let nameCol = -1;
                     let supervisorCol = -1;
                     let statusCol = -1;
+                    let dateCol = -1;
                     
                     if (scheduleDataRaw.length > 0) {
                         const headerRow = scheduleDataRaw[0];
@@ -1336,10 +1337,46 @@
                         for (let i = 0; i < headerRow.length; i++) {
                             const cell = headerRow[i] ? headerRow[i].toString().toLowerCase() : '';
                             if (cell.includes('nombre') || cell.includes('persona')) nameCol = i;
-                            if (cell.includes('supervisora')) supervisorCol = i;
+                            if (cell.includes('supervisor')) supervisorCol = i;
                             if (cell.includes('estado')) statusCol = i;
+                            if (cell.includes('fecha')) dateCol = i;
                         }
                         
+                        // Buscar la primera fecha válida en la columna de fecha
+                        let foundStartDate = false;
+                        for (let i = 1; i < scheduleDataRaw.length && !foundStartDate; i++) {
+                            const row = scheduleDataRaw[i];
+                            if (row && row[dateCol]) {
+                                const dateValue = row[dateCol];
+                                let date = null;
+                                
+                                // Intentar parsear la fecha
+                                if (dateValue instanceof Date) {
+                                    date = dateValue;
+                                } else if (typeof dateValue === 'string') {
+                                    // Intentar diferentes formatos de fecha
+                                    date = new Date(dateValue);
+                                    if (isNaN(date.getTime())) {
+                                        // Intentar formato DD/MM/YYYY
+                                        const parts = dateValue.split('/');
+                                        if (parts.length === 3) {
+                                            date = new Date(parts[2], parts[1] - 1, parts[0]);
+                                        }
+                                    }
+                                } else if (typeof dateValue === 'number') {
+                                    // Fecha serial de Excel
+                                    date = new Date((dateValue - 25569) * 86400 * 1000);
+                                }
+                                
+                                if (date && !isNaN(date.getTime())) {
+                                    scheduleData.startDate = new Date(date);
+                                    foundStartDate = true;
+                                    console.log('Fecha de inicio encontrada:', scheduleData.startDate);
+                                }
+                            }
+                        }
+                        
+                        // Procesar personas
                         for (let i = 1; i < scheduleDataRaw.length; i++) {
                             const row = scheduleDataRaw[i];
                             if (row && row[nameCol] && row[nameCol].toString().trim() !== '') {
@@ -1359,12 +1396,14 @@
 
                 processSupervisorNames();
 
-                if (!scheduleData.startDate) {
+                // Si no se encontró fecha en el Excel, usar fecha por defecto
+                if (!scheduleData.startDate || isNaN(scheduleData.startDate.getTime())) {
                     scheduleData.startDate = new Date('2025-11-03');
+                    console.log('Usando fecha por defecto:', scheduleData.startDate);
                 }
                 
                 updateDateInput();
-                initialize6x4Structure();
+                initialize7x4Structure();
                 
                 autoHideVacioDays();
                 
@@ -1377,9 +1416,8 @@
             }
         }
 
-        // Inicializar estructura
-        function initialize6x4Structure() {
-            const targetDays = [1, 3, 4, 5, 6, 0];
+        // Inicializar estructura 7x4 (7 días, 4 grupos)
+        function initialize7x4Structure() {
             const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
             
             scheduleData.groups.forEach((group, groupIndex) => {
@@ -1388,15 +1426,12 @@
                 let currentDate = new Date(scheduleData.startDate);
                 currentDate.setDate(currentDate.getDate() + (groupIndex * 7));
                 
+                // Asegurar que empezamos en lunes
                 while (currentDate.getDay() !== 1) {
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
                 
-                for (let i = 0; i < 6; i++) {
-                    while (!targetDays.includes(currentDate.getDay())) {
-                        currentDate.setDate(currentDate.getDate() + 1);
-                    }
-                    
+                for (let i = 0; i < 7; i++) {
                     const dayName = dayNames[currentDate.getDay()];
                     const dayNumber = currentDate.getDate();
                     const month = currentDate.getMonth() + 1;
@@ -1406,7 +1441,7 @@
                     
                     const people = [];
                     if (persons.length > 0) {
-                        const startIndex = (groupIndex * 12 + i * 2) % persons.length;
+                        const startIndex = (groupIndex * 14 + i * 2) % persons.length;
                         for (let j = 0; j < 2; j++) {
                             const personIndex = (startIndex + j) % persons.length;
                             if (persons[personIndex] && persons[personIndex].name.trim() !== '') {
@@ -2263,16 +2298,22 @@
                 
                 // Solo permitir arrastrar días que no estén vacíos u ocultos
                 if (!dayData.hidden && !dayData.isEmpty) {
-                    dayElement.addEventListener('touchstart', handleDayTouchStart);
-                    dayElement.addEventListener('touchmove', handleDayTouchMove);
-                    dayElement.addEventListener('touchend', handleDayTouchEnd);
-                    dayElement.addEventListener('touchcancel', handleDayTouchEnd);
+                    // Agregar evento solo al área del día, no a los elementos de persona
+                    dayElement.addEventListener('touchstart', handleDayTouchStart, { passive: true });
+                    dayElement.addEventListener('touchmove', handleDayTouchMove, { passive: false });
+                    dayElement.addEventListener('touchend', handleDayTouchEnd, { passive: true });
+                    dayElement.addEventListener('touchcancel', handleDayTouchEnd, { passive: true });
                 }
             });
         }
 
         function handleDayTouchStart(e) {
             if (!isLoggedIn) return;
+            
+            // Verificar si el toque fue en un elemento de persona
+            if (e.target.closest('.person-item')) {
+                return; // No procesar si es un toque en persona
+            }
             
             const dayElement = e.target.closest('.calendar-day');
             if (!dayElement) return;
@@ -2372,11 +2413,6 @@
             stopAutoScroll();
             
             if (!dayTouchDragState.isDragging) {
-                // Si no estábamos arrastrando, es un click normal
-                if (Date.now() - touchStartTime < 1000) {
-                    // Podrías agregar funcionalidad de click aquí si es necesario
-                }
-                
                 resetDayTouchState();
                 return;
             }
@@ -2872,28 +2908,36 @@
                 const newData = originalExcelStructure ? [...originalExcelStructure[scheduleSheetName]] : [];
                 
                 if (newData.length === 0) {
-                    newData.push(['Nombre', 'Supervisora', 'Fecha Asignada', 'Estado']);
+                    newData.push(['Nombre', 'Supervisor', 'Estado', 'Fecha']);
                 }
                 
-                let nameCol = -1, supervisorCol = -1, dateCol = -1, statusCol = -1;
+                let nameCol = -1, supervisorCol = -1, statusCol = -1, dateCol = -1;
                 if (newData.length > 0) {
                     const headerRow = newData[0];
                     for (let i = 0; i < headerRow.length; i++) {
                         const cell = headerRow[i] ? headerRow[i].toString().toLowerCase() : '';
                         if (cell.includes('nombre')) nameCol = i;
-                        if (cell.includes('supervisora')) supervisorCol = i;
-                        if (cell.includes('fecha') || cell.includes('día')) dateCol = i;
+                        if (cell.includes('supervisor')) supervisorCol = i;
                         if (cell.includes('estado')) statusCol = i;
+                        if (cell.includes('fecha')) dateCol = i;
                     }
                     
                     if (statusCol === -1) {
                         statusCol = headerRow.length;
                         newData[0].push('Estado');
                     }
+                    if (dateCol === -1) {
+                        dateCol = headerRow.length;
+                        newData[0].push('Fecha');
+                    }
                 }
                 
                 const headerRow = newData[0];
                 newData.splice(1, newData.length - 1);
+                
+                // Obtener la fecha del primer día del primer grupo
+                const firstDayDate = scheduleData.groups[0].days[0].date;
+                const formattedDate = `${firstDayDate.getDate()}/${firstDayDate.getMonth() + 1}/${firstDayDate.getFullYear()}`;
                 
                 scheduleData.groups.forEach((group, groupIndex) => {
                     group.days.forEach(day => {
@@ -2906,7 +2950,7 @@
                             const newRow = new Array(headerRow.length).fill('');
                             
                             if (nameCol !== -1) newRow[nameCol] = 'Vacio';
-                            if (dateCol !== -1) newRow[dateCol] = day.day;
+                            if (dateCol !== -1) newRow[dateCol] = formattedDate;
                             if (statusCol !== -1) {
                                 newRow[statusCol] = day.hidden ? 'Oculto (Vacio)' : 'Activo';
                             }
@@ -2918,7 +2962,7 @@
                                     const newRow = new Array(headerRow.length).fill('');
                                     
                                     if (nameCol !== -1) newRow[nameCol] = person;
-                                    if (dateCol !== -1) newRow[dateCol] = day.day;
+                                    if (dateCol !== -1) newRow[dateCol] = formattedDate;
                                     if (supervisorCol !== -1) {
                                         const personData = persons.find(p => p.name === person);
                                         if (personData && personData.supervisor) {
@@ -3070,7 +3114,7 @@
             });
             
             scheduleData.startDate = selectedDate;
-            initialize6x4Structure();
+            initialize7x4Structure();
             
             let nameIndex = 0;
             let hiddenIndex = 0;
