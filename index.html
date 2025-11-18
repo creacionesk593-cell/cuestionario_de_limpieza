@@ -604,65 +604,6 @@
         .font-lg .day-header { font-size: 18px; }
         .font-xl .day-header { font-size: 20px; }
 
-        .orientation-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .orientation-modal.active {
-            display: flex;
-        }
-
-        .orientation-box {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-        }
-
-        .orientation-box h2 {
-            margin-bottom: 20px;
-            color: #333;
-            font-size: 1.6em;
-        }
-
-        .orientation-options {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-bottom: 25px;
-        }
-
-        .orientation-option {
-            padding: 15px 25px;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: bold;
-        }
-
-        .orientation-option:hover {
-            border-color: #00b4db;
-            background: #f0f9ff;
-        }
-
-        .orientation-option.selected {
-            border-color: #00b4db;
-            background: #e3f2fd;
-        }
-
         /* Nuevos estilos para el sistema de drag & drop mejorado */
         .drop-indicator {
             height: 3px;
@@ -1026,23 +967,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE ORIENTACIÓN PARA DESCARGA -->
-    <div class="orientation-modal" id="orientationModal">
-        <div class="orientation-box">
-            <h2>Seleccione la orientación</h2>
-            <div class="orientation-options">
-                <div class="orientation-option" data-orientation="horizontal">
-                    📄 Horizontal
-                </div>
-                <div class="orientation-option" data-orientation="vertical">
-                    📄 Vertical
-                </div>
-            </div>
-            <button class="btn btn-primary" id="confirmDownloadBtn">Descargar</button>
-            <button class="btn btn-danger" id="cancelDownloadBtn" style="margin-top: 10px;">Cancelar</button>
-        </div>
-    </div>
-
     <!-- NUEVO MODAL PARA SELECCIONAR PERSONA -->
     <div class="person-select-modal" id="personSelectModal">
         <div class="person-select-box">
@@ -1066,7 +990,6 @@
         let currentExcelData = null;
         let originalExcelStructure = null;
         let currentExcelFile = null;
-        let selectedOrientation = 'horizontal';
         
         const EXCEL_FILENAME = 'Limpieza_igle.xlsx';
         
@@ -1112,6 +1035,12 @@
             sourceGroupIdx: null,
             sourceDayIdx: null
         };
+
+        // Variables para el sistema táctil
+        let touchStartTime = 0;
+        let touchStartElement = null;
+        let touchDragTimeout = null;
+        let isTouchDragging = false;
 
         // Función para verificar si un día tiene solo nombres "Vacio"
         function hasOnlyVacioNames(dayData) {
@@ -2082,6 +2011,165 @@
             showStatus(`Persona "${movedPerson}" movida correctamente`);
         }
 
+        // NUEVA FUNCIÓN: Sistema de drag & drop para dispositivos táctiles
+        function initializeTouchDragDrop() {
+            document.querySelectorAll('.person-item').forEach(personElement => {
+                personElement.addEventListener('touchstart', handleTouchStart);
+                personElement.addEventListener('touchmove', handleTouchMove);
+                personElement.addEventListener('touchend', handleTouchEnd);
+                personElement.addEventListener('touchcancel', handleTouchEnd);
+            });
+
+            document.querySelectorAll('.calendar-day').forEach(dayElement => {
+                dayElement.addEventListener('touchmove', handleDayTouchMove);
+                dayElement.addEventListener('touchend', handleDayTouchEnd);
+                dayElement.addEventListener('touchcancel', handleDayTouchEnd);
+            });
+        }
+
+        function handleTouchStart(e) {
+            if (!isLoggedIn) return;
+            
+            touchStartTime = Date.now();
+            touchStartElement = e.target.closest('.person-item');
+            
+            // Configurar timeout para iniciar arrastre después de 1 segundo
+            touchDragTimeout = setTimeout(() => {
+                if (touchStartElement) {
+                    isTouchDragging = true;
+                    
+                    // Seleccionar la persona
+                    selectPerson(touchStartElement);
+                    
+                    // Crear elemento fantasma para arrastre
+                    const ghost = document.createElement('div');
+                    ghost.className = 'drag-ghost';
+                    ghost.textContent = touchStartElement.textContent;
+                    document.body.appendChild(ghost);
+                    
+                    touchStartElement.classList.add('touch-dragging');
+                    
+                    // Actualizar posición del fantasma
+                    const touch = e.touches[0];
+                    ghost.style.left = touch.clientX + 'px';
+                    ghost.style.top = touch.clientY + 'px';
+                    
+                    // Marcar día origen
+                    const dayElement = touchStartElement.closest('.calendar-day');
+                    dayElement.classList.add('day-move-source');
+                }
+            }, 1000);
+        }
+
+        function handleTouchMove(e) {
+            if (!isTouchDragging || !touchStartElement) return;
+            
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const ghost = document.querySelector('.drag-ghost');
+            
+            if (ghost) {
+                ghost.style.left = touch.clientX + 'px';
+                ghost.style.top = touch.clientY + 'px';
+            }
+            
+            // Verificar si estamos sobre un día destino
+            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+            const targetDay = elements.find(el => el.classList.contains('calendar-day'));
+            
+            // Limpiar clases de día destino
+            document.querySelectorAll('.calendar-day.day-move-target').forEach(day => {
+                day.classList.remove('day-move-target');
+            });
+            
+            if (targetDay && !targetDay.classList.contains('hidden')) {
+                const sourceGroupIdx = parseInt(touchStartElement.dataset.group);
+                const sourceDayIdx = parseInt(touchStartElement.dataset.day);
+                const targetGroupIdx = parseInt(targetDay.dataset.group);
+                const targetDayIdx = parseInt(targetDay.dataset.day);
+                
+                // No permitir soltar en el mismo día
+                if (sourceGroupIdx !== targetGroupIdx || sourceDayIdx !== targetDayIdx) {
+                    targetDay.classList.add('day-move-target');
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            clearTimeout(touchDragTimeout);
+            
+            if (!isTouchDragging || !touchStartElement) {
+                // Si no estábamos arrastrando, es un click normal
+                if (touchStartElement && Date.now() - touchStartTime < 1000) {
+                    selectPerson(touchStartElement);
+                }
+                
+                resetTouchState();
+                return;
+            }
+            
+            e.preventDefault();
+            
+            const touch = e.changedTouches[0];
+            const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+            const targetDay = elements.find(el => el.classList.contains('calendar-day'));
+            
+            if (targetDay && !targetDay.classList.contains('hidden')) {
+                const sourceGroupIdx = parseInt(touchStartElement.dataset.group);
+                const sourceDayIdx = parseInt(touchStartElement.dataset.day);
+                const sourcePersonIdx = parseInt(touchStartElement.dataset.index);
+                const targetGroupIdx = parseInt(targetDay.dataset.group);
+                const targetDayIdx = parseInt(targetDay.dataset.day);
+                
+                // No permitir soltar en el mismo día
+                if (sourceGroupIdx !== targetGroupIdx || sourceDayIdx !== targetDayIdx) {
+                    movePersonToDay(
+                        sourceGroupIdx, 
+                        sourceDayIdx, 
+                        sourcePersonIdx, 
+                        targetGroupIdx, 
+                        targetDayIdx,
+                        -1 // Agregar al final
+                    );
+                }
+            }
+            
+            resetTouchState();
+        }
+
+        function handleDayTouchMove(e) {
+            if (!isTouchDragging) return;
+            e.preventDefault();
+        }
+
+        function handleDayTouchEnd(e) {
+            // Solo procesar si estamos arrastrando
+            if (!isTouchDragging) return;
+            e.preventDefault();
+        }
+
+        function resetTouchState() {
+            // Limpiar estado de arrastre táctil
+            isTouchDragging = false;
+            touchStartElement = null;
+            
+            // Remover elementos fantasma
+            const ghost = document.querySelector('.drag-ghost');
+            if (ghost) ghost.remove();
+            
+            // Limpiar clases
+            document.querySelectorAll('.person-item.touch-dragging').forEach(el => {
+                el.classList.remove('touch-dragging');
+            });
+            document.querySelectorAll('.calendar-day.day-move-source').forEach(el => {
+                el.classList.remove('day-move-source');
+            });
+            document.querySelectorAll('.calendar-day.day-move-target').forEach(el => {
+                el.classList.remove('day-move-target');
+            });
+        }
+
         // NUEVA FUNCIÓN: Abrir modal para seleccionar persona
         function openPersonSelectModal(groupIdx, dayIdx) {
             if (!isLoggedIn) {
@@ -2398,10 +2486,13 @@
             
             // Inicializar drag & drop según el dispositivo
             if (isMobileDevice) {
-                // En móviles solo usamos el sistema de flechas
+                // En móviles usar sistema táctil
+                setTimeout(() => {
+                    initializeTouchDragDrop();
+                }, 100);
             } else {
                 initializeDesktopDragDrop();
-                initializeDayDragDrop(); // NUEVO: Inicializar drag & drop de días
+                initializeDayDragDrop(); // Inicializar drag & drop de días
                 setTimeout(() => {
                     initializePersonListDragDrop();
                 }, 100);
@@ -2434,10 +2525,13 @@
             
             if (isLoggedIn) {
                 if (isMobileDevice) {
-                    // En móviles: click para seleccionar y usar flechas
+                    // En móviles: touch para seleccionar y arrastrar
                     personDiv.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        selectPerson(this);
+                        // Solo procesar si no estábamos arrastrando
+                        if (!isTouchDragging) {
+                            e.stopPropagation();
+                            selectPerson(this);
+                        }
                     });
                 } else {
                     // En desktop: drag & drop
@@ -2660,44 +2754,12 @@
             document.getElementById('loginModal').classList.remove('active');
         });
 
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            document.getElementById('orientationModal').classList.add('active');
-            
-            document.querySelectorAll('.orientation-option').forEach(option => {
-                option.classList.remove('selected');
-                if (option.dataset.orientation === selectedOrientation) {
-                    option.classList.add('selected');
-                }
-            });
+        // Descargar imagen simplificada (sin opción de orientación)
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            downloadImage();
         });
 
-        document.querySelectorAll('.orientation-option').forEach(option => {
-            option.addEventListener('click', function() {
-                document.querySelectorAll('.orientation-option').forEach(opt => {
-                    opt.classList.remove('selected');
-                });
-                this.classList.add('selected');
-                selectedOrientation = this.dataset.orientation;
-            });
-        });
-
-        document.getElementById('confirmDownloadBtn').addEventListener('click', () => {
-            document.getElementById('orientationModal').classList.remove('active');
-            downloadImage(selectedOrientation);
-        });
-
-        document.getElementById('cancelDownloadBtn').addEventListener('click', () => {
-            document.getElementById('orientationModal').classList.remove('active');
-        });
-
-        // NUEVOS EVENT LISTENERS PARA EL MODAL DE PERSONAS
-        document.getElementById('confirmPersonBtn').addEventListener('click', addSelectedPerson);
-        
-        document.getElementById('cancelPersonBtn').addEventListener('click', () => {
-            document.getElementById('personSelectModal').classList.remove('active');
-        });
-
-        function downloadImage(orientation) {
+        function downloadImage() {
             document.querySelector('.container').classList.add('download-mode');
             
             const config = {
@@ -2707,27 +2769,27 @@
                 logging: false
             };
             
-            if (orientation === 'vertical') {
-                config.width = document.querySelector('.container').scrollWidth;
-                config.height = document.querySelector('.container').scrollHeight;
-                config.windowWidth = document.querySelector('.container').scrollWidth;
-                config.windowHeight = document.querySelector('.container').scrollHeight;
-            }
-            
             html2canvas(document.querySelector('.container'), config).then(canvas => {
                 document.querySelector('.container').classList.remove('download-mode');
                 
                 const link = document.createElement('a');
-                link.download = `cronograma-limpieza-${orientation}.png`;
+                link.download = `cronograma-limpieza.png`;
                 link.href = canvas.toDataURL();
                 link.click();
-                showStatus(`Imagen ${orientation} descargada correctamente`);
+                showStatus(`Imagen descargada correctamente`);
             }).catch(error => {
                 document.querySelector('.container').classList.remove('download-mode');
                 console.error('Error al descargar imagen:', error);
                 showStatus('Error al descargar la imagen', 'error');
             });
         }
+
+        // NUEVOS EVENT LISTENERS PARA EL MODAL DE PERSONAS
+        document.getElementById('confirmPersonBtn').addEventListener('click', addSelectedPerson);
+        
+        document.getElementById('cancelPersonBtn').addEventListener('click', () => {
+            document.getElementById('personSelectModal').classList.remove('active');
+        });
 
         document.getElementById('applyDateBtn').addEventListener('click', function() {
             const dateInput = document.getElementById('startDate');
