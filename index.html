@@ -19,6 +19,7 @@
             min-height: 100vh;
             padding: 20px;
             touch-action: pan-y;
+            overflow-x: hidden;
         }
 
         .container {
@@ -797,6 +798,31 @@
             transform: translate(-50%, -50%);
         }
 
+        /* Indicadores de desplazamiento */
+        .scroll-indicator {
+            position: fixed;
+            width: 100%;
+            height: 60px;
+            background: linear-gradient(to bottom, rgba(0,180,219,0.7), transparent);
+            z-index: 9998;
+            display: none;
+            pointer-events: none;
+        }
+
+        .scroll-indicator.top {
+            top: 0;
+            background: linear-gradient(to bottom, rgba(0,180,219,0.7), transparent);
+        }
+
+        .scroll-indicator.bottom {
+            bottom: 0;
+            background: linear-gradient(to top, rgba(0,180,219,0.7), transparent);
+        }
+
+        .scroll-indicator.active {
+            display: block;
+        }
+
         @media (max-width: 1200px) {
             .calendar-grid {
                 grid-template-columns: repeat(4, 1fr);
@@ -896,6 +922,10 @@
     </style>
 </head>
 <body>
+    <!-- Indicadores de desplazamiento -->
+    <div class="scroll-indicator top" id="scrollTopIndicator"></div>
+    <div class="scroll-indicator bottom" id="scrollBottomIndicator"></div>
+
     <div class="container">
         <div class="header">
             <h1>📅 CRONOGRAMA DE LIMPIEZA MENSUAL</h1>
@@ -1041,6 +1071,8 @@
         let touchStartElement = null;
         let touchDragTimeout = null;
         let isTouchDragging = false;
+        let scrollInterval = null;
+        let autoScrollSpeed = 10;
 
         // Función para verificar si un día tiene solo nombres "Vacio"
         function hasOnlyVacioNames(dayData) {
@@ -2011,6 +2043,32 @@
             showStatus(`Persona "${movedPerson}" movida correctamente`);
         }
 
+        // NUEVA FUNCIÓN: Sistema de desplazamiento automático durante arrastre
+        function startAutoScroll(direction) {
+            if (scrollInterval) clearInterval(scrollInterval);
+            
+            scrollInterval = setInterval(() => {
+                const currentScroll = window.scrollY || document.documentElement.scrollTop;
+                
+                if (direction === 'down') {
+                    window.scrollTo(0, currentScroll + autoScrollSpeed);
+                } else if (direction === 'up') {
+                    window.scrollTo(0, currentScroll - autoScrollSpeed);
+                }
+            }, 16); // ~60fps
+        }
+
+        function stopAutoScroll() {
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+            
+            // Ocultar indicadores de desplazamiento
+            document.getElementById('scrollTopIndicator').classList.remove('active');
+            document.getElementById('scrollBottomIndicator').classList.remove('active');
+        }
+
         // NUEVA FUNCIÓN: Sistema de drag & drop para dispositivos táctiles
         function initializeTouchDragDrop() {
             document.querySelectorAll('.person-item').forEach(personElement => {
@@ -2094,10 +2152,30 @@
                     targetDay.classList.add('day-move-target');
                 }
             }
+            
+            // NUEVO: Sistema de desplazamiento automático
+            const scrollThreshold = 100; // Distancia desde los bordes para activar desplazamiento
+            const viewportHeight = window.innerHeight;
+            
+            // Verificar si estamos cerca del borde inferior
+            if (touch.clientY > viewportHeight - scrollThreshold) {
+                document.getElementById('scrollBottomIndicator').classList.add('active');
+                startAutoScroll('down');
+            }
+            // Verificar si estamos cerca del borde superior
+            else if (touch.clientY < scrollThreshold) {
+                document.getElementById('scrollTopIndicator').classList.add('active');
+                startAutoScroll('up');
+            }
+            // Si no estamos cerca de los bordes, detener el desplazamiento
+            else {
+                stopAutoScroll();
+            }
         }
 
         function handleTouchEnd(e) {
             clearTimeout(touchDragTimeout);
+            stopAutoScroll();
             
             if (!isTouchDragging || !touchStartElement) {
                 // Si no estábamos arrastrando, es un click normal
